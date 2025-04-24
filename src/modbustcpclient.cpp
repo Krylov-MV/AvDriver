@@ -43,10 +43,9 @@ void ModbusTcpClient::WriteHoldingRegisters(const std::vector<std::vector<Indust
                 int start_address = config_datas[i][0].address;
                 int lenght = config_datas[i][config_datas[i].size() - 1].address + GetLength(config_datas[i][config_datas[i].size() - 1].type) - config_datas[i][0].address;
 
-                std::cout << "start_address - " << start_address << " lenght - " << lenght << std::endl;
+                //std::cout << "start_address - " << start_address << " lenght - " << lenght << std::endl;
                 for (unsigned long j = 0; j < data[i].size(); j++) {
                     tab_reg[j] = data[i][j];
-                    std::cout << tab_reg[j] << std::endl;
                 }
 
                 int rc = modbus_write_registers(ctx_, start_address, lenght, tab_reg);

@@ -44,6 +44,8 @@ void OpcUaClient::ReadDatas(const std::vector<IndustrialProtocolUtils::DataConfi
                 }
             }
         }
+    } else {
+        Disconnect();
     }
 
     for (int i = 0; i < data_count; i++) { UA_ReadValueId_clear(&items[i]); }
@@ -107,6 +109,10 @@ void OpcUaClient::WriteDatas(std::vector<IndustrialProtocolUtils::DataResult>& d
 
     UA_WriteResponse response = UA_Client_Service_write(client_, request);
 
+    if (response.responseHeader.serviceResult != UA_STATUSCODE_GOOD) {
+        Disconnect();
+    }
+
     UA_WriteResponse_clear(&response);
     for (int i = 0; i < data_count; i++) { UA_WriteValue_clear(&items[i]); }
 }
@@ -159,6 +165,11 @@ void OpcUaClient::WriteDatas(const std::vector<IndustrialProtocolUtils::DataConf
     request.nodesToWriteSize = data_count;
 
     UA_WriteResponse response = UA_Client_Service_write(client_, request);
+    std::cout << "eadew" << std::endl;
+    std::cout << response.results << std::endl;
+    if (response.results != UA_STATUSCODE_GOOD) {
+        Disconnect();
+    }
 }
 
 bool OpcUaClient::Connect() {

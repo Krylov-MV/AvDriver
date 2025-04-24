@@ -120,8 +120,8 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
     for (unsigned int i = 0; i < data_results.size(); i ++) {
         if (data_results[i].time_previos == 0) { data_results[i].time_previos = data_results[i].time_current; }
         if (data_results[i].time_current != data_results[i].time_previos) {
-            std::cout << data_results[i].time_current << std::endl;
-            std::cout << data_results[i].time_previos << std::endl;
+            //std::cout << data_results[i].time_current << std::endl;
+            //std::cout << data_results[i].time_previos << std::endl;
             data_results[i].time_previos = data_results[i].time_current;
             if (modbus_configs.empty()) {
                 modbus_configs.push_back({ .address = data_results[i].address, .type = data_results[i].type, .name = data_results[i].name });
