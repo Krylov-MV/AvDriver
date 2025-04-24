@@ -214,11 +214,11 @@ int main() {
     std::vector<std::shared_ptr<ModbusTcpClient>> modbus_tcp_clients;
 
     modbus_tcp_device_config.eth_osn_ip_osn = "192.168.201.1";
-    modbus_tcp_device_config.eth_osn_ip_rez = "192.168.201.2";
+    modbus_tcp_device_config.eth_osn_ip_rez = "192.168.201.129";
     modbus_tcp_device_config.eth_rez_ip_osn = "192.168.201.3";
-    modbus_tcp_device_config.eth_rez_ip_rez = "192.168.201.4";
+    modbus_tcp_device_config.eth_rez_ip_rez = "192.168.201.131";
     modbus_tcp_device_config.port = 502;
-    modbus_tcp_device_config.max_socket_in_eth = 2;
+    modbus_tcp_device_config.max_socket_in_eth = 4;
     modbus_tcp_device_config.mapping_full_allow = true;
 
     IndustrialProtocolUtils::OpcUaDeviceConfig opc_ua_device_config;
@@ -275,12 +275,12 @@ int main() {
             }
         }
 
-        std::cout << "Beg OpcUaToModbusTcp" << std::endl;
+        //std::cout << "Beg OpcUaToModbusTcp" << std::endl;
         OpcUaToModbusTcp(opc_ua_device_config, opc_to_modbus_tcp_configs, opc_to_modbus_results, opc_ua_client, modbus_tcp_device_config, modbus_tcp_clients);
-        std::cout << "End OpcUaToModbusTcp" << std::endl;
-        std::cout << "Beg ModbusTcpToOpcUa" << std::endl;
+        //std::cout << "End OpcUaToModbusTcp" << std::endl;
+        //std::cout << "Beg ModbusTcpToOpcUa" << std::endl;
         ModbusTcpToOpcUa(modbus_tcp_device_config, modbus_tcp_to_opc_configs, modbus_tcp_clients, opc_ua_client);
-        std::cout << "End ModbusTcpToOpcUa" << std::endl;
+        //std::cout << "End ModbusTcpToOpcUa" << std::endl;
 
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
