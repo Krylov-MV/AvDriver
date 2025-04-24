@@ -1,1 +1,0 @@
-/usr/bin/clang++  -g   CMakeFiles/AvDriver.dir/main.cpp.o CMakeFiles/AvDriver.dir/modbustcpclient.cpp.o CMakeFiles/AvDriver.dir/industrialprotocolutils.cpp.o CMakeFiles/AvDriver.dir/opcuaclient.cpp.o CMakeFiles/AvDriver.dir/rtm64var.cpp.o  -o AvDriver  -Wl,-rpath,/usr/local/lib -lmodbus /usr/local/lib/libopen62541.so.1.3.4 -lpthread -lm -lrt 

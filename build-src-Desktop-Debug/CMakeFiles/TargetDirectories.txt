@@ -1,3 +1,0 @@
-/home/vmware/Проекты/Qt/AvDriver/build-src-Desktop-Debug/CMakeFiles/rebuild_cache.dir
-/home/vmware/Проекты/Qt/AvDriver/build-src-Desktop-Debug/CMakeFiles/edit_cache.dir
-/home/vmware/Проекты/Qt/AvDriver/build-src-Desktop-Debug/CMakeFiles/AvDriver.dir
