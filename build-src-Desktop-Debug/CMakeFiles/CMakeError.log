@@ -1,0 +1,63 @@
+Performing C++ SOURCE FILE Test CMAKE_HAVE_LIBC_PTHREAD failed with the following output:
+Change Dir: /home/vmware/Проекты/Qt/AvDriver/build-src-Desktop-Debug/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_bd1ff/fast && /usr/bin/make -f CMakeFiles/cmTC_bd1ff.dir/build.make CMakeFiles/cmTC_bd1ff.dir/build
+make[1]: вход в каталог «/home/vmware/Проекты/Qt/AvDriver/build-src-Desktop-Debug/CMakeFiles/CMakeTmp»
+Building CXX object CMakeFiles/cmTC_bd1ff.dir/src.cxx.o
+/usr/bin/clang++    -DCMAKE_HAVE_LIBC_PTHREAD   -o CMakeFiles/cmTC_bd1ff.dir/src.cxx.o -c /home/vmware/Проекты/Qt/AvDriver/build-src-Desktop-Debug/CMakeFiles/CMakeTmp/src.cxx
+Linking CXX executable cmTC_bd1ff
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_bd1ff.dir/link.txt --verbose=1
+/usr/bin/clang++   -DCMAKE_HAVE_LIBC_PTHREAD    CMakeFiles/cmTC_bd1ff.dir/src.cxx.o  -o cmTC_bd1ff 
+CMakeFiles/cmTC_bd1ff.dir/src.cxx.o: In function `main':
+src.cxx:(.text+0x35): undefined reference to `pthread_create'
+src.cxx:(.text+0x41): undefined reference to `pthread_detach'
+src.cxx:(.text+0x53): undefined reference to `pthread_join'
+src.cxx:(.text+0x6a): undefined reference to `pthread_atfork'
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+CMakeFiles/cmTC_bd1ff.dir/build.make:86: ошибка выполнения рецепта для цели «cmTC_bd1ff»
+make[1]: *** [cmTC_bd1ff] Ошибка 1
+make[1]: выход из каталога «/home/vmware/Проекты/Qt/AvDriver/build-src-Desktop-Debug/CMakeFiles/CMakeTmp»
+Makefile:121: ошибка выполнения рецепта для цели «cmTC_bd1ff/fast»
+make: *** [cmTC_bd1ff/fast] Ошибка 2
+
+
+Source file was:
+#include <pthread.h>
+
+void* test_func(void* data)
+{
+  return data;
+}
+
+int main(void)
+{
+  pthread_t thread;
+  pthread_create(&thread, NULL, test_func, NULL);
+  pthread_detach(thread);
+  pthread_join(thread, NULL);
+  pthread_atfork(NULL, NULL, NULL);
+  pthread_exit(NULL);
+
+  return 0;
+}
+
+Determining if the function pthread_create exists in the pthreads failed with the following output:
+Change Dir: /home/vmware/Проекты/Qt/AvDriver/build-src-Desktop-Debug/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_7b9f7/fast && /usr/bin/make -f CMakeFiles/cmTC_7b9f7.dir/build.make CMakeFiles/cmTC_7b9f7.dir/build
+make[1]: вход в каталог «/home/vmware/Проекты/Qt/AvDriver/build-src-Desktop-Debug/CMakeFiles/CMakeTmp»
+Building CXX object CMakeFiles/cmTC_7b9f7.dir/CheckFunctionExists.cxx.o
+/usr/bin/clang++    -DCHECK_FUNCTION_EXISTS=pthread_create   -o CMakeFiles/cmTC_7b9f7.dir/CheckFunctionExists.cxx.o -c /home/vmware/Проекты/Qt/AvDriver/build-src-Desktop-Debug/CMakeFiles/CheckLibraryExists/CheckFunctionExists.cxx
+Linking CXX executable cmTC_7b9f7
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_7b9f7.dir/link.txt --verbose=1
+/usr/bin/clang++   -DCHECK_FUNCTION_EXISTS=pthread_create    CMakeFiles/cmTC_7b9f7.dir/CheckFunctionExists.cxx.o  -o cmTC_7b9f7  -lpthreads 
+/usr/bin/ld: cannot find -lpthreads
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+CMakeFiles/cmTC_7b9f7.dir/build.make:86: ошибка выполнения рецепта для цели «cmTC_7b9f7»
+make[1]: *** [cmTC_7b9f7] Ошибка 1
+make[1]: выход из каталога «/home/vmware/Проекты/Qt/AvDriver/build-src-Desktop-Debug/CMakeFiles/CMakeTmp»
+Makefile:121: ошибка выполнения рецепта для цели «cmTC_7b9f7/fast»
+make: *** [cmTC_7b9f7/fast] Ошибка 2
+
+
+
