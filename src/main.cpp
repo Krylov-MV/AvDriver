@@ -187,11 +187,18 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
 
     //Собираем группы в потоки по числу максимального количества соединений
     //std::cout << "//Собираем группы в потоки по числу максимального количества соединений" << std::endl;
-    std::vector<std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>> thread_modbus_tcp_to_opc_configs(modbus_tcp_device_config.max_socket_in_eth);
-    std::vector<std::vector<std::vector<uint16_t>>> threads_datas(modbus_tcp_device_config.max_socket_in_eth);
+    std::vector<std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>> thread_modbus_tcp_to_opc_configs(modbus_tcp_device_config.max_socket_in_eth * 4);
+    std::vector<std::vector<std::vector<uint16_t>>> threads_datas(modbus_tcp_device_config.max_socket_in_eth * 4);
 
-    uint max_thread_in_eth = thread_modbus_configs.size() / modbus_tcp_device_config.max_socket_in_eth + thread_modbus_configs.size() % modbus_tcp_device_config.max_socket_in_eth;
-    for (uint i = 0; i < modbus_tcp_device_config.max_socket_in_eth; i++) {
+    uint max_socket_in_eth = 0;
+    for (unsigned int i = 0; i < modbus_tcp_clients.size(); i++) {
+        if (modbus_tcp_clients[i]->CheckConnection()) {
+            max_socket_in_eth++;
+        }
+    }
+
+    uint max_thread_in_eth = thread_modbus_configs.size() / max_socket_in_eth+ thread_modbus_configs.size() % max_socket_in_eth;
+    for (uint i = 0; i < max_socket_in_eth; i++) {
         for (uint j = i * max_thread_in_eth; j < i * max_thread_in_eth + max_thread_in_eth; j++) {
             if (j >= max_thread_in_eth) { break; }
             thread_modbus_tcp_to_opc_configs[i].push_back(thread_modbus_configs[j]);

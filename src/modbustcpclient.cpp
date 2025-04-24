@@ -36,7 +36,6 @@ void ModbusTcpClient::ReadHoldingRegisters(const std::vector<std::vector<Industr
 }
 
 void ModbusTcpClient::WriteHoldingRegisters(const std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>& config_datas, const std::vector<std::vector<uint16_t>>& data) {
-    std::cout << "write" << std::endl;
     if (is_connected_) {
         if (!config_datas.empty()) {
             for (unsigned long i = 0; i < config_datas.size(); i++) {
