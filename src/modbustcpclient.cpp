@@ -40,14 +40,16 @@ void ModbusTcpClient::WriteHoldingRegisters(const std::vector<std::vector<Indust
         if (!config_datas.empty()) {
             for (unsigned long i = 0; i < config_datas.size(); i++) {
                 uint16_t tab_reg[100];
-                int start = config_datas[i][0].address;
+                int start_address = config_datas[i][0].address;
                 int lenght = config_datas[i][config_datas[i].size() - 1].address + GetLength(config_datas[i][config_datas[i].size() - 1].type) - config_datas[i][0].address;
 
+                std::cout << "start_address - " << start_address << " lenght - " << lenght << std::endl;
                 for (unsigned long j = 0; j < data[i].size(); j++) {
                     tab_reg[j] = data[i][j];
+                    std::cout << tab_reg[j] << std::endl;
                 }
 
-                int rc = modbus_write_registers(ctx_, start, lenght, tab_reg);
+                int rc = modbus_write_registers(ctx_, start_address, lenght, tab_reg);
                 if (rc < 0) {
                     Disconnect();
                 }

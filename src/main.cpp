@@ -59,7 +59,9 @@ void ModbusTcpToOpcUa(const IndustrialProtocolUtils::ModbusTcpDeviceConfig &modb
             max_socket_in_eth++;
         }
     }
-    uint max_thread_in_eth = modbus_configs.size() / max_socket_in_eth + modbus_configs.size() % max_socket_in_eth;
+    //std::cout << max_socket_in_eth << std::endl;
+    uint max_thread_in_eth = modbus_configs.size() / max_socket_in_eth;// + modbus_configs.size() % max_socket_in_eth;
+    if (modbus_configs.size() % max_socket_in_eth != 0) { max_thread_in_eth++; }
     //std::cout << "Всего бочек в каждом соединении - " << max_thread_in_eth << std::endl;
 
     for (uint i = 0; i < max_socket_in_eth; i++) {
@@ -118,6 +120,8 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
     for (unsigned int i = 0; i < data_results.size(); i ++) {
         if (data_results[i].time_previos == 0) { data_results[i].time_previos = data_results[i].time_current; }
         if (data_results[i].time_current != data_results[i].time_previos) {
+            std::cout << data_results[i].time_current << std::endl;
+            std::cout << data_results[i].time_previos << std::endl;
             data_results[i].time_previos = data_results[i].time_current;
             if (modbus_configs.empty()) {
                 modbus_configs.push_back({ .address = data_results[i].address, .type = data_results[i].type, .name = data_results[i].name });
@@ -145,7 +149,6 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
             } else {
                 uint length = modbus_configs[modbus_configs.size() - 1].address - start_address + ModbusTcpClient::GetLength(data_results[i].type);
                 bool new_thread = modbus_configs[i].address > modbus_configs[i - 1].address + ModbusTcpClient::GetLength(data_results[i - 1].type);
-
                 if (length > 100 || new_thread) {
                     thread_modbus_configs.push_back(modbus_configs);
                     thread_datas.push_back(datas);
@@ -179,7 +182,6 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
             }
         }
     }
-
     if (!modbus_configs.empty()) {
         thread_modbus_configs.push_back(modbus_configs);
         thread_datas.push_back(datas);
@@ -197,7 +199,7 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
         }
     }
 
-    uint max_thread_in_eth = thread_modbus_configs.size() / max_socket_in_eth+ thread_modbus_configs.size() % max_socket_in_eth;
+    uint max_thread_in_eth = thread_modbus_configs.size() / max_socket_in_eth + thread_modbus_configs.size() % max_socket_in_eth;
     for (uint i = 0; i < max_socket_in_eth; i++) {
         for (uint j = i * max_thread_in_eth; j < i * max_thread_in_eth + max_thread_in_eth; j++) {
             if (j >= max_thread_in_eth) { break; }
@@ -210,7 +212,9 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
 
     for (unsigned long i = 0; i < thread_modbus_tcp_to_opc_configs.size(); i++) {
         if (!thread_modbus_tcp_to_opc_configs[i].empty())
-        threads.emplace_back([&,i] () {ThreadModbusTcpClientWrite(modbus_tcp_clients[i], thread_modbus_tcp_to_opc_configs[i], threads_datas[i]);});
+        {
+            threads.emplace_back([&,i] () {ThreadModbusTcpClientWrite(modbus_tcp_clients[i], thread_modbus_tcp_to_opc_configs[i], threads_datas[i]);});
+        }
     }
 
     for (auto& th : threads) {
@@ -244,7 +248,7 @@ int main() {
     while (true) {
         //Если нет связи с OPC сервером, то нет смысла обрабатывать логику
         if (!opc_ua_client.CheckConnection()) {
-            //std::cout << "Нет связи с OPC сервером" << std::endl;
+            std::cout << "Нет связи с OPC сервером" << std::endl;
             std::this_thread::sleep_for(std::chrono::milliseconds(5000));
             continue;
         }
@@ -298,11 +302,12 @@ int main() {
         }
 
         if (link_is_fail) {
-            //std::cout << "Нет связи с Modbus устройством" << std::endl;
+            std::cout << "Нет связи с Modbus устройством" << std::endl;
             std::this_thread::sleep_for(std::chrono::milliseconds(5000));
             continue;
         }
 
+        //std::cout << modbus_tcp_to_opc_configs.size() << std::endl;
         //std::cout << "Beg OpcUaToModbusTcp" << std::endl;
         OpcUaToModbusTcp(opc_ua_device_config, opc_to_modbus_tcp_configs, opc_to_modbus_results, opc_ua_client, modbus_tcp_device_config, modbus_tcp_clients);
         //std::cout << "End OpcUaToModbusTcp" << std::endl;
@@ -310,7 +315,7 @@ int main() {
         ModbusTcpToOpcUa(modbus_tcp_device_config, modbus_tcp_to_opc_configs, modbus_tcp_clients, opc_ua_client);
         //std::cout << "End ModbusTcpToOpcUa" << std::endl;
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 
     return 0;
