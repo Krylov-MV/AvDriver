@@ -24,7 +24,7 @@ void ModbusTcpToOpcUa(const IndustrialProtocolUtils::ModbusTcpDeviceConfig &modb
     //std::cout << "//Собираем опрос в группы по 125 регистров" << std::endl;
     std::vector<IndustrialProtocolUtils::DataConfig> configs;
     std::vector<std::vector<IndustrialProtocolUtils::DataConfig>> modbus_configs;
-    std::vector<std::vector<IndustrialProtocolUtils::DataResult>> data_results(modbus_tcp_device_config.max_socket_in_eth);
+    std::vector<std::vector<IndustrialProtocolUtils::DataResult>> data_results(modbus_tcp_device_config.max_socket_in_eth * 4);
 
     uint start_address = modbus_tcp_to_opc_configs[0].address;
     for (unsigned int i = 0; i < modbus_tcp_to_opc_configs.size(); i++) {
@@ -51,13 +51,18 @@ void ModbusTcpToOpcUa(const IndustrialProtocolUtils::ModbusTcpDeviceConfig &modb
 
     //Собираем группы в потоки по числу максимального количества соединений
     //std::cout << "//Собираем группы в потоки по числу максимального количества соединений" << std::endl;
-    std::vector<std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>> tread_modbus_tcp_to_opc_configs(modbus_tcp_device_config.max_socket_in_eth);
+    std::vector<std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>> tread_modbus_tcp_to_opc_configs(modbus_tcp_device_config.max_socket_in_eth * 4);
 
-    uint max_thread_in_eth = modbus_configs.size() / modbus_tcp_device_config.max_socket_in_eth + modbus_configs.size() % modbus_tcp_device_config.max_socket_in_eth;
-
+    uint max_socket_in_eth = 0;
+    for (unsigned int i = 0; i < modbus_tcp_clients.size(); i++) {
+        if (modbus_tcp_clients[i]->CheckConnection()) {
+            max_socket_in_eth++;
+        }
+    }
+    uint max_thread_in_eth = modbus_configs.size() / max_socket_in_eth + modbus_configs.size() % max_socket_in_eth;
     //std::cout << "Всего бочек в каждом соединении - " << max_thread_in_eth << std::endl;
 
-    for (uint i = 0; i < modbus_tcp_device_config.max_socket_in_eth; i++) {
+    for (uint i = 0; i < max_socket_in_eth; i++) {
         for (uint j = i * max_thread_in_eth; j < i * max_thread_in_eth + max_thread_in_eth; j++) {
             if (j >= modbus_configs.size()) { break; }
             tread_modbus_tcp_to_opc_configs[i].push_back(modbus_configs[j]);
@@ -67,7 +72,7 @@ void ModbusTcpToOpcUa(const IndustrialProtocolUtils::ModbusTcpDeviceConfig &modb
     //Опрос всех соединений
     //std::cout << "//Опрос всех соединений" << std::endl;
     std::vector<std::thread> threads;
-    for (unsigned long i = 0; i < modbus_tcp_clients.size(); i++) {
+    for (unsigned long i = 0; i < max_socket_in_eth; i++) {
         if (!(tread_modbus_tcp_to_opc_configs.empty() || data_results.empty())) {
             threads.emplace_back([&, i] () {ThreadModbusTcpClientRead(modbus_tcp_clients[i], tread_modbus_tcp_to_opc_configs[i], data_results[i]);});
         }
@@ -81,7 +86,7 @@ void ModbusTcpToOpcUa(const IndustrialProtocolUtils::ModbusTcpDeviceConfig &modb
     //Подготовка и запись данных для записи в OPC сервер
     //std::cout << "//Подготовка и запись данных для записи в OPC сервер" << std::endl;
     std::vector<IndustrialProtocolUtils::DataResult> datas;
-    for (unsigned long i = 0; i < modbus_tcp_clients.size(); i++) {
+    for (unsigned long i = 0; i < max_socket_in_eth; i++) {
         for (unsigned long j = 0; j < data_results[i].size(); j++) {
             datas.push_back(data_results[i][j]);
         }
@@ -213,14 +218,6 @@ int main() {
     std::vector<IndustrialProtocolUtils::DataConfig> modbus_tcp_to_opc_configs;
     std::vector<std::shared_ptr<ModbusTcpClient>> modbus_tcp_clients;
 
-    modbus_tcp_device_config.eth_osn_ip_osn = "192.168.201.1";
-    modbus_tcp_device_config.eth_osn_ip_rez = "192.168.201.129";
-    modbus_tcp_device_config.eth_rez_ip_osn = "192.168.201.3";
-    modbus_tcp_device_config.eth_rez_ip_rez = "192.168.201.131";
-    modbus_tcp_device_config.port = 502;
-    modbus_tcp_device_config.max_socket_in_eth = 4;
-    modbus_tcp_device_config.mapping_full_allow = true;
-
     IndustrialProtocolUtils::OpcUaDeviceConfig opc_ua_device_config;
     std::vector<IndustrialProtocolUtils::DataConfig> opc_to_modbus_tcp_configs;
 
@@ -229,7 +226,7 @@ int main() {
 
     IndustrialProtocolUtils::ReadConfig(modbus_tcp_device_config, modbus_tcp_to_opc_configs, opc_ua_device_config, opc_to_modbus_tcp_configs);
 
-    for (uint i = 0; i < modbus_tcp_device_config.max_socket_in_eth; i++) {
+    for (uint i = 0; i < modbus_tcp_device_config.max_socket_in_eth * 4; i++) {
         modbus_tcp_clients.push_back(std::make_shared<ModbusTcpClient>());
     }
 
@@ -245,34 +242,58 @@ int main() {
             continue;
         }
         //Если нет связи с Modbus устройством, то нет смысла обрабатывать логику
-        if (!modbus_tcp_clients[0]->CheckConnection()) {
-            if (!(modbus_tcp_clients[0]->Connect(modbus_tcp_device_config.eth_osn_ip_osn, modbus_tcp_device_config.port))) {
-                if (!(modbus_tcp_clients[0]->Connect(modbus_tcp_device_config.eth_osn_ip_rez, modbus_tcp_device_config.port))) {
-                    if (!(modbus_tcp_clients[0]->Connect(modbus_tcp_device_config.eth_rez_ip_osn, modbus_tcp_device_config.port))) {
-                        if (!(modbus_tcp_clients[0]->Connect(modbus_tcp_device_config.eth_rez_ip_rez, modbus_tcp_device_config.port))) {
-                            //std::cout << "Нет связи с Modbus устройстом" << std::endl;
-                            std::this_thread::sleep_for(std::chrono::milliseconds(5000));
-                            continue;
-                        } else {
-                            for (uint i = 1; i < modbus_tcp_device_config.max_socket_in_eth; i++) {
-                                modbus_tcp_clients[i]->Connect(modbus_tcp_device_config.eth_rez_ip_rez, modbus_tcp_device_config.port);
-                            }
-                        }
-                    } else {
-                        for (uint i = 1; i < modbus_tcp_device_config.max_socket_in_eth; i++) {
-                            modbus_tcp_clients[i]->Connect(modbus_tcp_device_config.eth_rez_ip_osn, modbus_tcp_device_config.port);
-                        }
-                    }
-                } else {
-                    for (uint i = 1; i < modbus_tcp_device_config.max_socket_in_eth; i++) {
-                        modbus_tcp_clients[i]->Connect(modbus_tcp_device_config.eth_osn_ip_rez, modbus_tcp_device_config.port);
-                    }
-                }
-            } else {
+        bool link_is_fail = true;
+        uint j = 0;
+        if (!modbus_tcp_clients[j]->CheckConnection()) {
+            if (modbus_tcp_clients[j]->Connect(modbus_tcp_device_config.eth_osn_ip_osn, modbus_tcp_device_config.port)) {
+                j++;
                 for (uint i = 1; i < modbus_tcp_device_config.max_socket_in_eth; i++) {
-                    modbus_tcp_clients[i]->Connect(modbus_tcp_device_config.eth_osn_ip_osn, modbus_tcp_device_config.port);
+                    if (modbus_tcp_clients[j]->Connect(modbus_tcp_device_config.eth_osn_ip_osn, modbus_tcp_device_config.port)) { j++; }
                 }
             }
+        }
+        if (!modbus_tcp_device_config.eth_osn_ip_rez.empty()){
+            if (!modbus_tcp_clients[j]->CheckConnection()) {
+                if (modbus_tcp_clients[j]->Connect(modbus_tcp_device_config.eth_osn_ip_rez, modbus_tcp_device_config.port)) {
+                    j++;
+                    for (uint i = 1; i < modbus_tcp_device_config.max_socket_in_eth; i++) {
+                        if (modbus_tcp_clients[j]->Connect(modbus_tcp_device_config.eth_osn_ip_rez, modbus_tcp_device_config.port)) { j++; }
+                    }
+                }
+            }
+        }
+        if (!modbus_tcp_device_config.eth_osn_ip_rez.empty()){
+            if (!modbus_tcp_clients[j]->CheckConnection()) {
+                if (modbus_tcp_clients[j]->Connect(modbus_tcp_device_config.eth_rez_ip_osn, modbus_tcp_device_config.port)) {
+                    j++;
+                    for (uint i = 1; i < modbus_tcp_device_config.max_socket_in_eth; i++) {
+                        if (modbus_tcp_clients[j]->Connect(modbus_tcp_device_config.eth_rez_ip_osn, modbus_tcp_device_config.port)) { j++; }
+                    }
+                }
+            }
+        }
+        if (!modbus_tcp_device_config.eth_osn_ip_rez.empty()){
+            if (!modbus_tcp_clients[j]->CheckConnection()) {
+                if (modbus_tcp_clients[j]->Connect(modbus_tcp_device_config.eth_rez_ip_rez, modbus_tcp_device_config.port)) {
+                    j++;
+                    for (uint i = 1; i < modbus_tcp_device_config.max_socket_in_eth; i++) {
+                        if (modbus_tcp_clients[j]->Connect(modbus_tcp_device_config.eth_rez_ip_rez, modbus_tcp_device_config.port)) { j++; }
+                    }
+                }
+            }
+        }
+
+        for (unsigned int i = 0; i < modbus_tcp_clients.size(); i++) {
+            if (modbus_tcp_clients[i]->CheckConnection()) {
+                link_is_fail = false;
+                break;
+            }
+        }
+
+        if (link_is_fail) {
+            //std::cout << "Нет связи с Modbus устройством" << std::endl;
+            std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+            continue;
         }
 
         //std::cout << "Beg OpcUaToModbusTcp" << std::endl;
