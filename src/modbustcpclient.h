@@ -12,7 +12,6 @@ class ModbusTcpClient {
 public:
     ModbusTcpClient(const std::string& ip, int port)
         : ip_(ip), port_(port), is_connected_(false), should_run_(true) {
-        Disconnect();
         Connect();
     }
     ModbusTcpClient()

@@ -119,7 +119,7 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
     uint start_address = data_results[0].address;
     for (unsigned int i = 0; i < data_results.size(); i ++) {
         if (data_results[i].time_previos == 0) { data_results[i].time_previos = data_results[i].time_current; }
-        if (data_results[i].time_current != data_results[i].time_previos) {
+        if (data_results[i].time_current > data_results[i].time_previos) {
             //std::cout << data_results[i].time_current << std::endl;
             //std::cout << data_results[i].time_previos << std::endl;
             data_results[i].time_previos = data_results[i].time_current;
@@ -315,7 +315,7 @@ int main() {
         ModbusTcpToOpcUa(modbus_tcp_device_config, modbus_tcp_to_opc_configs, modbus_tcp_clients, opc_ua_client);
         //std::cout << "End ModbusTcpToOpcUa" << std::endl;
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
     return 0;

@@ -175,6 +175,7 @@ void OpcUaClient::WriteDatas(const std::vector<IndustrialProtocolUtils::DataConf
 bool OpcUaClient::Connect() {
     char* opc_url = strdup(ip_.c_str());
     UA_StatusCode status_code = UA_Client_connect(client_, opc_url);
+    free(opc_url);
 
     is_connected_ = status_code == UA_STATUSCODE_GOOD;
     return is_connected_;
@@ -186,6 +187,7 @@ bool OpcUaClient::Connect(const std::string ip, int port) {
 
     char* opc_url = strdup(ip_.c_str());
     UA_StatusCode status_code = UA_Client_connect(client_, opc_url);
+    free(opc_url);
 
     is_connected_ = status_code = UA_STATUSCODE_GOOD;
     return is_connected_;
