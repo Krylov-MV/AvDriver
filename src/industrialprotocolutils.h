@@ -5,7 +5,6 @@
 #include <sstream>
 #include <fstream>
 #include <string>
-#include <open62541.h>
 #include <vector>
 #include <algorithm>
 
@@ -62,8 +61,8 @@ public:
         DataType type;
         uint address;
         std::string name;
-        UA_DateTime time_previos;
-        UA_DateTime time_current;
+        long time_previos;
+        long time_current;
     };
 
     static void ReadConfig (IndustrialProtocolUtils::ModbusTcpDeviceConfig &modbus_tcp_device_config, std::vector<IndustrialProtocolUtils::DataConfig> &modbus_tcp_to_opc_configs,

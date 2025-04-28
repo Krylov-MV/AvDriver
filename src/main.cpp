@@ -1,4 +1,5 @@
 #include <thread>
+#include <memory>
 
 #include "industrialprotocolutils.h"
 #include "modbustcpclient.h"
