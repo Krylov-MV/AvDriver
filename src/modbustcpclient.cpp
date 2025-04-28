@@ -134,21 +134,27 @@ void ModbusTcpClient::GetValue(const IndustrialProtocolUtils::DataType& type, co
     {
     case IndustrialProtocolUtils::DataType::INT:
         data[0] = value.i;
+        break;
     case IndustrialProtocolUtils::DataType::UINT:
     case IndustrialProtocolUtils::DataType::WORD:
         data[0] = value.u;
+        break;
     case IndustrialProtocolUtils::DataType::DINT:
         data[0] = value.i >> 16;
         data[1] = value.i & 65535;
+        break;
     case IndustrialProtocolUtils::DataType::UDINT:
     case IndustrialProtocolUtils::DataType::DWORD:
         data[0] = value.u >> 16;
         data[1] = value.u & 65535;
+        break;
     case IndustrialProtocolUtils::DataType::REAL:
         modbus_set_float_abcd(value.f, &data[0]);
+        break;
     default:
         data[0] = 0;
         data[1] = 0;
+        break;
     }
 }
 

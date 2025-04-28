@@ -130,32 +130,44 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
                 {
                 case IndustrialProtocolUtils::DataType::INT:
                     datas.push_back(data_results[i].value.i);
+                    break;
                 case IndustrialProtocolUtils::DataType::UINT:
                 case IndustrialProtocolUtils::DataType::WORD:
                     datas.push_back(data_results[i].value.u);
+                    break;
                 case IndustrialProtocolUtils::DataType::DINT:
                     datas.push_back(data_results[i].value.i >> 16);
                     datas.push_back(data_results[i].value.i & 65535);
+                    break;
                 case IndustrialProtocolUtils::DataType::UDINT:
                 case IndustrialProtocolUtils::DataType::DWORD:
                     datas.push_back(data_results[i].value.u >> 16);
                     datas.push_back(data_results[i].value.u & 65535);
+                    break;
                 case IndustrialProtocolUtils::DataType::REAL:
                     uint16_t temp[2];
                     memcpy(temp, &data_results[i].value.f, sizeof(float));
                     datas.push_back(temp[0]);
                     datas.push_back(temp[1]);
+                    break;
                 }
             } else {
-                uint length = modbus_configs[modbus_configs.size() - 1].address - start_address + ModbusTcpClient::GetLength(data_results[i].type);
-                bool new_thread = modbus_configs[i].address > modbus_configs[i - 1].address + ModbusTcpClient::GetLength(data_results[i - 1].type);
+                uint length = data_results[i].address - start_address + ModbusTcpClient::GetLength(data_results[i].type);
+                bool new_thread = data_results[i].address > data_results[i - 1].address + ModbusTcpClient::GetLength(data_results[i - 1].type);
+
                 if (length > 100 || new_thread) {
+                    //std::cout << "new" << std::endl;
+                    //std::cout << start_address << std::endl;
+                    //std::cout << length << std::endl;
                     thread_modbus_configs.push_back(modbus_configs);
                     thread_datas.push_back(datas);
                     modbus_configs.clear();
                     datas.clear();
-                    start_address = modbus_configs[i].address;
+                    start_address = data_results[i].address;
                 }
+
+                //std::cout << data_results[i].address << std::endl;
+                //std::cout << length << std::endl;
 
                 modbus_configs.push_back({ .address = data_results[i].address, .type = data_results[i].type, .name = data_results[i].name });
 
@@ -163,21 +175,26 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
                 {
                 case IndustrialProtocolUtils::DataType::INT:
                     datas.push_back(data_results[i].value.i);
+                    break;
                 case IndustrialProtocolUtils::DataType::UINT:
                 case IndustrialProtocolUtils::DataType::WORD:
                     datas.push_back(data_results[i].value.u);
+                    break;
                 case IndustrialProtocolUtils::DataType::DINT:
                     datas.push_back(data_results[i].value.i >> 16);
                     datas.push_back(data_results[i].value.i & 65535);
+                    break;
                 case IndustrialProtocolUtils::DataType::UDINT:
                 case IndustrialProtocolUtils::DataType::DWORD:
                     datas.push_back(data_results[i].value.u >> 16);
                     datas.push_back(data_results[i].value.u & 65535);
+                    break;
                 case IndustrialProtocolUtils::DataType::REAL:
                     uint16_t temp[2];
                     memcpy(temp, &data_results[i].value.f, sizeof(float));
                     datas.push_back(temp[0]);
                     datas.push_back(temp[1]);
+                    break;
                 }
             }
         }
@@ -186,6 +203,8 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
         thread_modbus_configs.push_back(modbus_configs);
         thread_datas.push_back(datas);
     }
+
+    //std::cout << thread_modbus_configs.size() << std::endl;
 
     //Собираем группы в потоки по числу максимального количества соединений
     //std::cout << "//Собираем группы в потоки по числу максимального количества соединений" << std::endl;
