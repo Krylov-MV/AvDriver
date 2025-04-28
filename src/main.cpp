@@ -1,6 +1,5 @@
 #include <thread>
 #include <memory>
-#include <chrono>
 
 #include "industrialprotocolutils.h"
 #include "modbustcpclient.h"

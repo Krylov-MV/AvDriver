@@ -4,7 +4,6 @@
 #include "industrialprotocolutils.h"
 #include <open62541/client.h>
 #include <open62541/plugin/log_stdout.h>
-#include <vector>
 
 #pragma once
 

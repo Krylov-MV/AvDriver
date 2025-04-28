@@ -3,7 +3,6 @@
 
 #include "industrialprotocolutils.h"
 
-#include <vector>
 #include <modbus/modbus.h>
 
 #pragma once
