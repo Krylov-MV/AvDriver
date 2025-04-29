@@ -1,6 +1,7 @@
 #include "modbustcpclient.h"
 
-void ModbusTcpClient::ReadHoldingRegisters(const std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>& config_datas, std::vector<IndustrialProtocolUtils::DataResult>& data_result) {
+void ModbusTcpClient::ReadHoldingRegisters(const std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>& config_datas,
+                                           std::vector<IndustrialProtocolUtils::DataResult>& data_result) {
     if (is_connected_) {
         if (!config_datas.empty()) {
             data_result.clear();
@@ -35,20 +36,49 @@ void ModbusTcpClient::ReadHoldingRegisters(const std::vector<std::vector<Industr
     }
 }
 
+void ModbusTcpClient::ReadHoldingRegisters(const std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>& config_datas,
+                                           std::map<uint16_t, uint16_t>& holding_registers,
+                                           std::mutex& mutex) {
+    if (is_connected_) {
+        if (!config_datas.empty()) {
+            for (auto config_data : config_datas) {
+                uint16_t tab_reg[125];
+                int start_address = config_data[0].address;
+                int length = config_data[config_data.size() - 1].address + GetLength(config_data[config_data.size() - 1].type) - config_data[0].address;
+
+                int rc = modbus_read_registers(ctx_, start_address, length, tab_reg);
+
+                std::lock_guard<std::mutex> lock(mutex);
+                if (rc == length) {
+                    for (unsigned int i = 0; i < length; i++) {
+                        holding_registers[start_address + i] = tab_reg[i];
+                    }
+                } else {
+                    //std::cerr << "Connection failed: " << modbus_strerror(errno) << std::endl;
+                    for (unsigned int i = 0; i < length; i++) {
+                        holding_registers.erase(start_address + i);
+                    }
+                    Disconnect();
+                }
+            }
+        }
+    }
+}
+
 void ModbusTcpClient::WriteHoldingRegisters(const std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>& config_datas, const std::vector<std::vector<uint16_t>>& data) {
     if (is_connected_) {
         if (!config_datas.empty()) {
             for (unsigned long i = 0; i < config_datas.size(); i++) {
                 uint16_t tab_reg[100];
                 int start_address = config_datas[i][0].address;
-                int lenght = config_datas[i][config_datas[i].size() - 1].address + GetLength(config_datas[i][config_datas[i].size() - 1].type) - config_datas[i][0].address;
+                int length = config_datas[i][config_datas[i].size() - 1].address + GetLength(config_datas[i][config_datas[i].size() - 1].type) - config_datas[i][0].address;
 
                 //std::cout << "start_address - " << start_address << " lenght - " << lenght << std::endl;
                 for (unsigned long j = 0; j < data[i].size(); j++) {
                     tab_reg[j] = data[i][j];
                 }
 
-                int rc = modbus_write_registers(ctx_, start_address, lenght, tab_reg);
+                int rc = modbus_write_registers(ctx_, start_address, length, tab_reg);
                 if (rc < 0) {
                     Disconnect();
                 }
@@ -102,8 +132,6 @@ int ModbusTcpClient::GetLength(const IndustrialProtocolUtils::DataType& type) {
     case IndustrialProtocolUtils::DataType::DWORD:
     case IndustrialProtocolUtils::DataType::REAL:
         return 2;
-    case IndustrialProtocolUtils::DataType::DOUBLE:
-        return 4;
     default:
         return 0;
     }

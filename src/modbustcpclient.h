@@ -4,6 +4,8 @@
 #include "industrialprotocolutils.h"
 
 #include <modbus/modbus.h>
+#include <map>
+#include <mutex>
 
 #pragma once
 
@@ -22,7 +24,21 @@ public:
         modbus_free(ctx_);
     }
 
+    struct Memory {
+        std::map<uint16_t, bool> dicrete_inputs;
+        std::map<uint16_t, bool> coils;
+        std::map<uint16_t, uint16_t> input_registers;
+        std::map<uint16_t, uint16_t> holding_registers;
+    };
+
+    struct DataToModbus {
+        int offset;
+        int length;
+        uint16_t* value[];
+    };
+
     void ReadHoldingRegisters(const std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>& config_datas, std::vector<IndustrialProtocolUtils::DataResult>& data_result);
+    void ReadHoldingRegisters(const std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>& config_datas, std::map<uint16_t, uint16_t>& holding_registers, std::mutex& mutex);
 
     void WriteHoldingRegisters(const std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>& config_datas, const std::vector<std::vector<uint16_t>>& data);
 

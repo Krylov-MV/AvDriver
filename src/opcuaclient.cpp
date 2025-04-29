@@ -1,5 +1,7 @@
 #include "opcuaclient.h"
 
+#include <open62541/statuscodes.h>
+
 void OpcUaClient::ReadDatas(const std::vector<IndustrialProtocolUtils::DataConfig>& data_configs, std::vector<IndustrialProtocolUtils::DataResult>& data_results) {
     int data_count = data_configs.size();
     UA_ReadValueId items[data_count];
@@ -22,11 +24,12 @@ void OpcUaClient::ReadDatas(const std::vector<IndustrialProtocolUtils::DataConfi
 
     if (response.responseHeader.serviceResult == UA_STATUSCODE_GOOD) {
         for (int i = 0; i < data_count; i++) {
-            if (response.results[i].hasValue) {
+            if (response.results[i].hasValue && (response.results[i].status >= UA_STATUSCODE_GOOD && response.results[i].status <= UA_STATUSCODE_UNCERTAIN)) {
                 data_results[i].address = data_configs[i].address;
                 data_results[i].name = data_configs[i].name;
                 data_results[i].type = data_configs[i].type;
                 data_results[i].time_current = response.results[i].sourceTimestamp;
+                data_results[i].quality_current = response.results[i].status;
                 switch (data_configs[i].type)
                 {
                 case (IndustrialProtocolUtils::DataType::INT):
@@ -106,6 +109,74 @@ void OpcUaClient::WriteDatas(std::vector<IndustrialProtocolUtils::DataResult>& d
             items[i].value.value.type = &UA_TYPES[UA_TYPES_FLOAT];
             items[i].value.value.storageType = UA_VARIANT_DATA_NODELETE;
             items[i].value.value.data = &datas[i].value.f;
+        }
+        items[i].value.hasValue = true;
+    }
+
+    request.nodesToWrite = items;
+    request.nodesToWriteSize = data_count;
+
+    UA_WriteResponse response = UA_Client_Service_write(client_, request);
+
+    if (response.responseHeader.serviceResult != UA_STATUSCODE_GOOD) {
+        Disconnect();
+    }
+
+    UA_WriteResponse_clear(&response);
+    for (int i = 0; i < data_count; i++) { UA_WriteValue_clear(&items[i]); }
+}
+
+void OpcUaClient::WriteDatas(std::vector<DataToOpc>& data_to_opc) {
+    int data_count = data_to_opc.size();
+
+    UA_WriteRequest request;
+    UA_WriteRequest_init(&request);
+    UA_WriteValue items[data_count];
+
+    for (int i = 0; i < data_count; i++) {
+        UA_WriteValue_init(&items[i]);
+
+        items[i].nodeId = UA_NODEID_STRING(1, strdup(data_to_opc[i].node_id.c_str()));
+        items[i].attributeId = UA_ATTRIBUTEID_VALUE;
+
+        switch (data_to_opc[i].type) {
+        case IndustrialProtocolUtils::DataType::INT: {
+            items[i].value.value.type = &UA_TYPES[UA_TYPES_INT16];
+            items[i].value.value.storageType = UA_VARIANT_DATA_NODELETE;
+            int16_t& value = std::get<int16_t>(data_to_opc[i].value);
+            items[i].value.value.data = &value;
+            break;
+        }
+        case IndustrialProtocolUtils::DataType::DINT: {
+            items[i].value.value.type = &UA_TYPES[UA_TYPES_INT32];
+            items[i].value.value.storageType = UA_VARIANT_DATA_NODELETE;
+            int32_t& value = std::get<int32_t>(data_to_opc[i].value);
+            items[i].value.value.data = &value;
+            break;
+        }
+        case IndustrialProtocolUtils::DataType::UINT:
+        case IndustrialProtocolUtils::DataType::WORD: {
+            items[i].value.value.type = &UA_TYPES[UA_TYPES_UINT16];
+            items[i].value.value.storageType = UA_VARIANT_DATA_NODELETE;
+            uint16_t& value = std::get<uint16_t>(data_to_opc[i].value);
+            items[i].value.value.data = &value;
+            break;
+        }
+        case IndustrialProtocolUtils::DataType::UDINT:
+        case IndustrialProtocolUtils::DataType::DWORD: {
+            items[i].value.value.type = &UA_TYPES[UA_TYPES_UINT32];
+            items[i].value.value.storageType = UA_VARIANT_DATA_NODELETE;
+            uint32_t& value = std::get<uint32_t>(data_to_opc[i].value);
+            items[i].value.value.data = &value;
+            break;
+        }
+        case IndustrialProtocolUtils::DataType::REAL: {
+            items[i].value.value.type = &UA_TYPES[UA_TYPES_FLOAT];
+            items[i].value.value.storageType = UA_VARIANT_DATA_NODELETE;
+            float& value = std::get<float>(data_to_opc[i].value);
+            items[i].value.value.data = &value;
+            break;
+        }
         }
         items[i].value.hasValue = true;
     }

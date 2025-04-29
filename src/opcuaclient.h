@@ -35,9 +35,16 @@ public:
         UA_Client_delete(client_);
     }
 
+    struct DataToOpc {
+        std::string node_id;
+        IndustrialProtocolUtils::DataType type;
+        std::variant<int16_t, uint16_t, int32_t, uint32_t, float> value;
+    };
+
     void ReadDatas(const std::vector<IndustrialProtocolUtils::DataConfig>& data_configs, std::vector<IndustrialProtocolUtils::DataResult>& data_results);
 
     void WriteDatas(std::vector<IndustrialProtocolUtils::DataResult>& datas);
+    void WriteDatas(std::vector<DataToOpc>& data_to_opc);
 
     void WriteDatas(const std::vector<IndustrialProtocolUtils::DataConfig>& data_configs, std::vector<IndustrialProtocolUtils::DataResult>& datas);
 

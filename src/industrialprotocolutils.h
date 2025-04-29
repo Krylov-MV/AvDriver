@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <variant>
 
 #pragma once
 
@@ -14,7 +15,7 @@ class IndustrialProtocolUtils {
 public:
     enum class ModbusMemoryType { DiscreteInputs, Coils, InputRegisters, HoldingRegisters };
 
-    enum class DataType { BOOL, BYTE, INT, UINT, WORD, DINT, UDINT, DWORD, REAL, DOUBLE, STRING };
+    enum class DataType { INT, UINT, WORD, DINT, UDINT, DWORD, REAL };
 
     enum class ModbusEthWorkType { ONE_ETH_OSN_OR_ONE_ETH_REZ, ONE_ETH_OSN_AND_ONE_ETH_REZ, TWO_ETH_OSN_OR_TWO_ETH_REZ, ALL_ETH };
 
@@ -63,10 +64,14 @@ public:
         std::string name;
         long time_previos;
         long time_current;
+        uint32_t quality_previos;
+        uint32_t quality_current;
     };
 
     static void ReadConfig (IndustrialProtocolUtils::ModbusTcpDeviceConfig &modbus_tcp_device_config, std::vector<IndustrialProtocolUtils::DataConfig> &modbus_tcp_to_opc_configs,
                             IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_device_config, std::vector<IndustrialProtocolUtils::DataConfig> &opc_to_modbus_tcp_configs);
+
+    static float ModbusToFloat(const uint16_t& high, const uint16_t& low);
 };
 
 #endif // INDUSTRIALPROTOCOLUTILS_H

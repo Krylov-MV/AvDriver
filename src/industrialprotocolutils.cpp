@@ -78,3 +78,14 @@ void IndustrialProtocolUtils::ReadConfig (IndustrialProtocolUtils::ModbusTcpDevi
     //}
     //while(true) {}
 }
+
+float IndustrialProtocolUtils::ModbusToFloat(const uint16_t& high, const uint16_t& low) {
+    union {
+        float f;
+        uint32_t u;
+    } convert;
+
+    convert.u = high << 16 | low;
+
+    return convert.f;
+}

@@ -6,9 +6,12 @@
 #include "opcuaclient.h"
 #include "rtm64var.h"
 
-void ThreadModbusTcpClientRead(std::shared_ptr<ModbusTcpClient> modbus_tcp_client, std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>& config_datas, std::vector<IndustrialProtocolUtils::DataResult>& data_result)
+void ThreadModbusTcpClientRead(std::shared_ptr<ModbusTcpClient> modbus_tcp_client,
+                               const std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>& config_datas,
+                               ModbusTcpClient::Memory &modbus_tcp_memory,
+                               std::mutex& mutex)
 {
-    modbus_tcp_client->ReadHoldingRegisters(config_datas, data_result);
+    modbus_tcp_client->ReadHoldingRegisters(std::ref(config_datas), std::ref(modbus_tcp_memory.holding_registers), std::ref(mutex));
 }
 
 void ThreadModbusTcpClientWrite(std::shared_ptr<ModbusTcpClient> modbus_tcp_client, const std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>& config_datas, const std::vector<std::vector<uint16_t>>& data)
@@ -19,13 +22,15 @@ void ThreadModbusTcpClientWrite(std::shared_ptr<ModbusTcpClient> modbus_tcp_clie
 void ModbusTcpToOpcUa(const IndustrialProtocolUtils::ModbusTcpDeviceConfig &modbus_tcp_device_config,
                       const std::vector<IndustrialProtocolUtils::DataConfig> &modbus_tcp_to_opc_configs,
                       std::vector<std::shared_ptr<ModbusTcpClient>> modbus_tcp_clients,
-                      OpcUaClient &opc_ua_client) {
+                      OpcUaClient &opc_ua_client,
+                      ModbusTcpClient::Memory &modbus_tcp_memory) {
+
+    std::mutex mutex;
 
     //Собираем опрос в группы по 125 регистров
     //std::cout << "//Собираем опрос в группы по 125 регистров" << std::endl;
     std::vector<IndustrialProtocolUtils::DataConfig> configs;
     std::vector<std::vector<IndustrialProtocolUtils::DataConfig>> modbus_configs;
-    std::vector<std::vector<IndustrialProtocolUtils::DataResult>> data_results(modbus_tcp_device_config.max_socket_in_eth * 4);
 
     uint start_address = modbus_tcp_to_opc_configs[0].address;
     for (unsigned int i = 0; i < modbus_tcp_to_opc_configs.size(); i++) {
@@ -38,7 +43,7 @@ void ModbusTcpToOpcUa(const IndustrialProtocolUtils::ModbusTcpDeviceConfig &modb
                 new_thread = modbus_tcp_to_opc_configs[i].address > modbus_tcp_to_opc_configs[i - 1].address + ModbusTcpClient::GetLength(modbus_tcp_to_opc_configs[i - 1].type);
             }
 
-            if (length > 125 || new_thread) {
+            if (length > MODBUS_MAX_READ_REGISTERS || new_thread) {
                 modbus_configs.push_back(configs);
                 configs.clear();
                 start_address = modbus_tcp_to_opc_configs[i].address;
@@ -61,7 +66,7 @@ void ModbusTcpToOpcUa(const IndustrialProtocolUtils::ModbusTcpDeviceConfig &modb
         }
     }
     //std::cout << max_socket_in_eth << std::endl;
-    uint max_thread_in_eth = modbus_configs.size() / max_socket_in_eth;// + modbus_configs.size() % max_socket_in_eth;
+    uint max_thread_in_eth = modbus_configs.size() / max_socket_in_eth;
     if (modbus_configs.size() % max_socket_in_eth != 0) { max_thread_in_eth++; }
     //std::cout << "Всего бочек в каждом соединении - " << max_thread_in_eth << std::endl;
 
@@ -76,8 +81,8 @@ void ModbusTcpToOpcUa(const IndustrialProtocolUtils::ModbusTcpDeviceConfig &modb
     //std::cout << "//Опрос всех соединений" << std::endl;
     std::vector<std::thread> threads;
     for (unsigned long i = 0; i < max_socket_in_eth; i++) {
-        if (!(tread_modbus_tcp_to_opc_configs.empty() || data_results.empty())) {
-            threads.emplace_back([&, i] () {ThreadModbusTcpClientRead(modbus_tcp_clients[i], tread_modbus_tcp_to_opc_configs[i], data_results[i]);});
+        if (!tread_modbus_tcp_to_opc_configs.empty()) {
+            threads.emplace_back([&, i] () {ThreadModbusTcpClientRead(modbus_tcp_clients[i], std::ref(tread_modbus_tcp_to_opc_configs[i]), std::ref(modbus_tcp_memory), std::ref(mutex));});
         }
     }
     for (auto& th : threads) {
@@ -88,14 +93,45 @@ void ModbusTcpToOpcUa(const IndustrialProtocolUtils::ModbusTcpDeviceConfig &modb
 
     //Подготовка и запись данных для записи в OPC сервер
     //std::cout << "//Подготовка и запись данных для записи в OPC сервер" << std::endl;
-    std::vector<IndustrialProtocolUtils::DataResult> datas;
-    for (unsigned long i = 0; i < max_socket_in_eth; i++) {
-        for (unsigned long j = 0; j < data_results[i].size(); j++) {
-            datas.push_back(data_results[i][j]);
-        }
-    }
+    if (!(modbus_tcp_memory.holding_registers.empty() || modbus_tcp_to_opc_configs.empty())) {
+        std::vector<OpcUaClient::DataToOpc> data_to_opc_ua;
 
-    opc_ua_client.WriteDatas(datas);
+        for (const IndustrialProtocolUtils::DataConfig& config : modbus_tcp_to_opc_configs) {
+            int length = ModbusTcpClient::GetLength(config.type);
+            bool modbus_memory_is_ok = true;
+
+            for (int i = 0; i < length; i++) {
+                if (auto it = modbus_tcp_memory.holding_registers.find(config.address + i) == modbus_tcp_memory.holding_registers.end()) {
+                    modbus_memory_is_ok = false;
+                }
+            }
+
+            if(modbus_memory_is_ok) {
+                std::variant<int16_t, uint16_t, int32_t, uint32_t, float> value;
+                switch (config.type) {
+                case IndustrialProtocolUtils::DataType::INT:
+                    value = (int16_t) modbus_tcp_memory.holding_registers[config.address];
+                    break;
+                case IndustrialProtocolUtils::DataType::DINT:
+                    value = (int32_t)modbus_tcp_memory.holding_registers[config.address] << 16 |  modbus_tcp_memory.holding_registers[config.address + 1];
+                    break;
+                case IndustrialProtocolUtils::DataType::UINT:
+                case IndustrialProtocolUtils::DataType::WORD:
+                    value = (uint16_t)modbus_tcp_memory.holding_registers[config.address];
+                    break;
+                case IndustrialProtocolUtils::DataType::UDINT:
+                case IndustrialProtocolUtils::DataType::DWORD:
+                    value = (uint32_t)modbus_tcp_memory.holding_registers[config.address] << 16 |  modbus_tcp_memory.holding_registers[config.address + 1];
+                    break;
+                case IndustrialProtocolUtils::DataType::REAL:
+                    value = IndustrialProtocolUtils::ModbusToFloat(modbus_tcp_memory.holding_registers[config.address + 1], modbus_tcp_memory.holding_registers[config.address]);
+                    break;
+                }
+                data_to_opc_ua.push_back({config.name, config.type, value});
+            }
+        }
+        opc_ua_client.WriteDatas(data_to_opc_ua);
+    }
 }
 
 void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_device_config,
@@ -119,10 +155,8 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
 
     uint start_address = data_results[0].address;
     for (unsigned int i = 0; i < data_results.size(); i ++) {
-        if (data_results[i].time_previos == 0) { data_results[i].time_previos = data_results[i].time_current; }
-        if (data_results[i].time_current > data_results[i].time_previos) {
-            //std::cout << data_results[i].time_current << std::endl;
-            //std::cout << data_results[i].time_previos << std::endl;
+        //if (data_results[i].time_previos == 0) { data_results[i].time_previos = data_results[i].time_current; }
+        if (data_results[i].time_current > data_results[i].time_previos && (data_results[i].quality_current >= UA_STATUSCODE_GOOD && data_results[i].quality_current <= UA_STATUSCODE_UNCERTAIN)) {
             data_results[i].time_previos = data_results[i].time_current;
             if (modbus_configs.empty()) {
                 modbus_configs.push_back({ .address = data_results[i].address, .type = data_results[i].type, .name = data_results[i].name });
@@ -156,19 +190,13 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
                 uint length = data_results[i].address - start_address + ModbusTcpClient::GetLength(data_results[i].type);
                 bool new_thread = data_results[i].address > data_results[i - 1].address + ModbusTcpClient::GetLength(data_results[i - 1].type);
 
-                if (length > 100 || new_thread) {
-                    //std::cout << "new" << std::endl;
-                    //std::cout << start_address << std::endl;
-                    //std::cout << length << std::endl;
+                if (length > MODBUS_MAX_WRITE_REGISTERS || new_thread) {
                     thread_modbus_configs.push_back(modbus_configs);
                     thread_datas.push_back(datas);
                     modbus_configs.clear();
                     datas.clear();
                     start_address = data_results[i].address;
                 }
-
-                //std::cout << data_results[i].address << std::endl;
-                //std::cout << length << std::endl;
 
                 modbus_configs.push_back({ .address = data_results[i].address, .type = data_results[i].type, .name = data_results[i].name });
 
@@ -204,8 +232,6 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
         thread_modbus_configs.push_back(modbus_configs);
         thread_datas.push_back(datas);
     }
-
-    //std::cout << thread_modbus_configs.size() << std::endl;
 
     //Собираем группы в потоки по числу максимального количества соединений
     //std::cout << "//Собираем группы в потоки по числу максимального количества соединений" << std::endl;
@@ -248,6 +274,7 @@ int main() {
     IndustrialProtocolUtils::ModbusTcpDeviceConfig modbus_tcp_device_config;
     std::vector<IndustrialProtocolUtils::DataConfig> modbus_tcp_to_opc_configs;
     std::vector<std::shared_ptr<ModbusTcpClient>> modbus_tcp_clients;
+    ModbusTcpClient::Memory modbus_tcp_memory;
 
     IndustrialProtocolUtils::OpcUaDeviceConfig opc_ua_device_config;
     std::vector<IndustrialProtocolUtils::DataConfig> opc_to_modbus_tcp_configs;
@@ -332,7 +359,7 @@ int main() {
         OpcUaToModbusTcp(opc_ua_device_config, opc_to_modbus_tcp_configs, opc_to_modbus_results, opc_ua_client, modbus_tcp_device_config, modbus_tcp_clients);
         //std::cout << "End OpcUaToModbusTcp" << std::endl;
         //std::cout << "Beg ModbusTcpToOpcUa" << std::endl;
-        ModbusTcpToOpcUa(modbus_tcp_device_config, modbus_tcp_to_opc_configs, modbus_tcp_clients, opc_ua_client);
+        ModbusTcpToOpcUa(modbus_tcp_device_config, modbus_tcp_to_opc_configs, modbus_tcp_clients, opc_ua_client, modbus_tcp_memory);
         //std::cout << "End ModbusTcpToOpcUa" << std::endl;
 
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
