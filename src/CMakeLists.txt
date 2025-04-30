@@ -16,8 +16,6 @@ add_executable(AvDriver
     industrialprotocolutils.cpp
     industrialprotocolutils.h
     opcuaclient.cpp
-    opcuaclient.h
-    rtm64var.cpp
-    rtm64var.h)
+    opcuaclient.h)
 
 target_link_libraries(AvDriver ${libmodbus} open62541)

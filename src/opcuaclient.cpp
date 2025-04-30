@@ -1,9 +1,19 @@
 #include "opcuaclient.h"
 
-#include <open62541/statuscodes.h>
+const std::set<std::string> OpcUaClient::types = { "INT", "UINT", "WORD", "DINT", "UDINT", "DWORD", "REAL" };
 
-void OpcUaClient::ReadDatas(const std::vector<IndustrialProtocolUtils::DataConfig>& data_configs, std::vector<IndustrialProtocolUtils::DataResult>& data_results) {
-    int data_count = data_configs.size();
+int OpcUaClient::TypeLength(const std::string& type) {
+    if (!types.contains(type)) {
+        return 0;
+    }  else if (type == "INT" || type == "UINT" || type == "WORD") {
+        return 1;
+    }  else if (type == "DINT" || type == "UDINT" || type == "DWORD" || type == "REAL") {
+        return 2;
+    }
+}
+
+void OpcUaClient::ReadData(const std::vector<ReadConfig>& configs, std::vector<ReadResult>& results) {
+    int data_count = configs.size();
     UA_ReadValueId items[data_count];
 
     UA_ReadRequest request;
@@ -11,7 +21,7 @@ void OpcUaClient::ReadDatas(const std::vector<IndustrialProtocolUtils::DataConfi
 
     for (int i = 0; i < data_count; i++) {
         UA_ReadValueId_init(&items[i]);
-        items[i].nodeId = UA_NODEID_STRING(1, strdup(data_configs[i].name.c_str()));
+        items[i].nodeId = UA_NODEID_STRING(1, strdup(configs[i].node_id.c_str()));
         items[i].attributeId = UA_ATTRIBUTEID_VALUE;
     }
 
@@ -25,33 +35,27 @@ void OpcUaClient::ReadDatas(const std::vector<IndustrialProtocolUtils::DataConfi
     if (response.responseHeader.serviceResult == UA_STATUSCODE_GOOD) {
         for (int i = 0; i < data_count; i++) {
             if (response.results[i].hasValue && (response.results[i].status >= UA_STATUSCODE_GOOD && response.results[i].status <= UA_STATUSCODE_UNCERTAIN)) {
-                data_results[i].address = data_configs[i].address;
-                data_results[i].name = data_configs[i].name;
-                data_results[i].type = data_configs[i].type;
-                data_results[i].time_current = response.results[i].sourceTimestamp;
-                data_results[i].quality_current = response.results[i].status;
-                switch (data_configs[i].type)
-                {
-                case (IndustrialProtocolUtils::DataType::INT):
-                    data_results[i].value.i = *(int*)response.results[i].value.data;
-                    break;
-                case (IndustrialProtocolUtils::DataType::DINT):
-                    data_results[i].value.i = *(int*)response.results[i].value.data;
-                    break;
-                case (IndustrialProtocolUtils::DataType::UINT):
-                case (IndustrialProtocolUtils::DataType::WORD):
-                    data_results[i].value.u = *(uint*)response.results[i].value.data;
-                    break;
-                case (IndustrialProtocolUtils::DataType::UDINT):
-                case (IndustrialProtocolUtils::DataType::DWORD):
-                    data_results[i].value.u = *(uint*)response.results[i].value.data;
-                    break;
-                case (IndustrialProtocolUtils::DataType::REAL):
-                    data_results[i].value.f = *(UA_Float*)response.results[i].value.data;
-                    break;
+                long source_timestamp = response.results[i].sourceTimestamp;
+                uint32_t quality = response.results[i].status;
+                std::string node_id = configs[i].node_id;
+                std::variant<int16_t, uint16_t, int32_t, uint32_t, float> value;
+                if (configs[i].type == "INT") {
+                    value = *(int16_t*)response.results[i].value.data;
                 }
-            } else {
-                //std::cout << data_configs[i].address << std::endl;
+                if (configs[i].type == "DINT") {
+                    value = *(int32_t*)response.results[i].value.data;
+                }
+                if (configs[i].type == "UINT" || configs[i].type == "WORD") {
+                    value = *(uint16_t*)response.results[i].value.data;
+                }
+                if (configs[i].type == "UDINT" || configs[i].type == "DWORD") {
+                    value = *(uint32_t*)response.results[i].value.data;
+                }
+                if (configs[i].type == "REAL") {
+                    value = *(float*)response.results[i].value.data;
+                }
+
+                results.push_back({value, source_timestamp, quality, node_id});
             }
         }
     } else {
@@ -62,123 +66,56 @@ void OpcUaClient::ReadDatas(const std::vector<IndustrialProtocolUtils::DataConfi
     UA_ReadResponse_clear(&response);
 }
 
-void OpcUaClient::WriteDatas(std::vector<IndustrialProtocolUtils::DataResult>& datas) {
-    int data_count = datas.size();
-
-    UA_WriteRequest request;
-    UA_WriteRequest_init(&request);
-    UA_WriteValue items[data_count];
-
-    for (int i = 0; i < data_count; i++) {
-        UA_WriteValue_init(&items[i]);
-
-        items[i].nodeId = UA_NODEID_STRING(1, strdup(datas[i].name.c_str()));
-        items[i].attributeId = UA_ATTRIBUTEID_VALUE;
-
-        if (datas[i].type == IndustrialProtocolUtils::DataType::INT) {
-            items[i].value.value.type = &UA_TYPES[UA_TYPES_INT16];
-            items[i].value.value.storageType = UA_VARIANT_DATA_NODELETE;
-            items[i].value.value.data = &datas[i].value.i;
-        }
-        if (datas[i].type == IndustrialProtocolUtils::DataType::DINT) {
-            items[i].value.value.type = &UA_TYPES[UA_TYPES_INT32];
-            items[i].value.value.storageType = UA_VARIANT_DATA_NODELETE;
-            items[i].value.value.data = &datas[i].value.i;
-        }
-        if (datas[i].type == IndustrialProtocolUtils::DataType::UINT) {
-            items[i].value.value.type = &UA_TYPES[UA_TYPES_UINT16];
-            items[i].value.value.storageType = UA_VARIANT_DATA_NODELETE;
-            items[i].value.value.data = &datas[i].value.u;
-        }
-        if (datas[i].type == IndustrialProtocolUtils::DataType::WORD) {
-            items[i].value.value.type = &UA_TYPES[UA_TYPES_UINT16];
-            items[i].value.value.storageType = UA_VARIANT_DATA_NODELETE;
-            items[i].value.value.data = &datas[i].value.u;
-        }
-        if (datas[i].type == IndustrialProtocolUtils::DataType::UDINT) {
-            items[i].value.value.type = &UA_TYPES[UA_TYPES_UINT32];
-            items[i].value.value.storageType = UA_VARIANT_DATA_NODELETE;
-            items[i].value.value.data = &datas[i].value.u;
-        }
-        if (datas[i].type == IndustrialProtocolUtils::DataType::DWORD) {
-            items[i].value.value.type = &UA_TYPES[UA_TYPES_UINT32];
-            items[i].value.value.storageType = UA_VARIANT_DATA_NODELETE;
-            items[i].value.value.data = &datas[i].value.u;
-        }
-        if (datas[i].type == IndustrialProtocolUtils::DataType::REAL) {
-            items[i].value.value.type = &UA_TYPES[UA_TYPES_FLOAT];
-            items[i].value.value.storageType = UA_VARIANT_DATA_NODELETE;
-            items[i].value.value.data = &datas[i].value.f;
-        }
-        items[i].value.hasValue = true;
-    }
-
-    request.nodesToWrite = items;
-    request.nodesToWriteSize = data_count;
-
-    UA_WriteResponse response = UA_Client_Service_write(client_, request);
-
-    if (response.responseHeader.serviceResult != UA_STATUSCODE_GOOD) {
-        Disconnect();
-    }
-
-    UA_WriteResponse_clear(&response);
-    for (int i = 0; i < data_count; i++) { UA_WriteValue_clear(&items[i]); }
-}
-
-void OpcUaClient::WriteDatas(std::vector<DataToOpc>& data_to_opc) {
+void OpcUaClient::WriteData(std::vector<WriteConfig>& data_to_opc) {
     int data_count = data_to_opc.size();
 
     UA_WriteRequest request;
     UA_WriteRequest_init(&request);
     UA_WriteValue items[data_count];
 
+    int j = 0;
     for (int i = 0; i < data_count; i++) {
-        UA_WriteValue_init(&items[i]);
+        if (types.contains(data_to_opc[i].type)) {
+            UA_WriteValue_init(&items[j]);
 
-        items[i].nodeId = UA_NODEID_STRING(1, strdup(data_to_opc[i].node_id.c_str()));
-        items[i].attributeId = UA_ATTRIBUTEID_VALUE;
+            items[j].nodeId = UA_NODEID_STRING(1, strdup(data_to_opc[i].node_id.c_str()));
+            items[j].attributeId = UA_ATTRIBUTEID_VALUE;
 
-        switch (data_to_opc[i].type) {
-        case IndustrialProtocolUtils::DataType::INT: {
-            items[i].value.value.type = &UA_TYPES[UA_TYPES_INT16];
-            items[i].value.value.storageType = UA_VARIANT_DATA_NODELETE;
-            int16_t& value = std::get<int16_t>(data_to_opc[i].value);
-            items[i].value.value.data = &value;
-            break;
+            if (data_to_opc[i].type == "INT") {
+                items[j].value.value.type = &UA_TYPES[UA_TYPES_INT16];
+                items[j].value.value.storageType = UA_VARIANT_DATA_NODELETE;
+                int16_t& value = std::get<int16_t>(data_to_opc[i].value);
+                items[j].value.value.data = &value;
+            }
+            if (data_to_opc[i].type == "DINT") {
+                items[j].value.value.type = &UA_TYPES[UA_TYPES_INT32];
+                items[j].value.value.storageType = UA_VARIANT_DATA_NODELETE;
+                int32_t& value = std::get<int32_t>(data_to_opc[i].value);
+                items[j].value.value.data = &value;
+            }
+             if (data_to_opc[i].type == "UINT" || data_to_opc[i].type == "WORD") {
+                items[j].value.value.type = &UA_TYPES[UA_TYPES_UINT16];
+                items[j].value.value.storageType = UA_VARIANT_DATA_NODELETE;
+                uint16_t& value = std::get<uint16_t>(data_to_opc[i].value);
+                items[j].value.value.data = &value;
+            }
+            if (data_to_opc[i].type == "UDINT" || data_to_opc[i].type == "DWORD") {
+                items[j].value.value.type = &UA_TYPES[UA_TYPES_UINT32];
+                items[j].value.value.storageType = UA_VARIANT_DATA_NODELETE;
+                uint32_t& value = std::get<uint32_t>(data_to_opc[i].value);
+                items[j].value.value.data = &value;
+            }
+            if (data_to_opc[i].type == "REAL") {
+                items[j].value.value.type = &UA_TYPES[UA_TYPES_FLOAT];
+                items[j].value.value.storageType = UA_VARIANT_DATA_NODELETE;
+                float& value = std::get<float>(data_to_opc[i].value);
+                items[j].value.value.data = &value;
+            }
+
+            items[j].value.hasValue = true;
+
+            j++;
         }
-        case IndustrialProtocolUtils::DataType::DINT: {
-            items[i].value.value.type = &UA_TYPES[UA_TYPES_INT32];
-            items[i].value.value.storageType = UA_VARIANT_DATA_NODELETE;
-            int32_t& value = std::get<int32_t>(data_to_opc[i].value);
-            items[i].value.value.data = &value;
-            break;
-        }
-        case IndustrialProtocolUtils::DataType::UINT:
-        case IndustrialProtocolUtils::DataType::WORD: {
-            items[i].value.value.type = &UA_TYPES[UA_TYPES_UINT16];
-            items[i].value.value.storageType = UA_VARIANT_DATA_NODELETE;
-            uint16_t& value = std::get<uint16_t>(data_to_opc[i].value);
-            items[i].value.value.data = &value;
-            break;
-        }
-        case IndustrialProtocolUtils::DataType::UDINT:
-        case IndustrialProtocolUtils::DataType::DWORD: {
-            items[i].value.value.type = &UA_TYPES[UA_TYPES_UINT32];
-            items[i].value.value.storageType = UA_VARIANT_DATA_NODELETE;
-            uint32_t& value = std::get<uint32_t>(data_to_opc[i].value);
-            items[i].value.value.data = &value;
-            break;
-        }
-        case IndustrialProtocolUtils::DataType::REAL: {
-            items[i].value.value.type = &UA_TYPES[UA_TYPES_FLOAT];
-            items[i].value.value.storageType = UA_VARIANT_DATA_NODELETE;
-            float& value = std::get<float>(data_to_opc[i].value);
-            items[i].value.value.data = &value;
-            break;
-        }
-        }
-        items[i].value.hasValue = true;
     }
 
     request.nodesToWrite = items;
@@ -191,72 +128,8 @@ void OpcUaClient::WriteDatas(std::vector<DataToOpc>& data_to_opc) {
     }
 
     UA_WriteResponse_clear(&response);
-    for (int i = 0; i < data_count; i++) { UA_WriteValue_clear(&items[i]); }
-}
 
-void OpcUaClient::WriteDatas(const std::vector<IndustrialProtocolUtils::DataConfig>& data_configs, std::vector<IndustrialProtocolUtils::DataResult>& datas) {
-    int data_count = data_configs.size();
-
-    UA_WriteValue items[data_count];
-
-    for (int i = 0; i < data_count; i++) {
-        UA_WriteValue_init(&items[i]);
-
-        items[i].nodeId = UA_NODEID_STRING(1, strdup(data_configs[i].name.c_str()));
-        items[i].attributeId = UA_ATTRIBUTEID_VALUE;
-
-        if (datas[i].type == IndustrialProtocolUtils::DataType::INT) {
-            items[i].value.value.type = &UA_TYPES[UA_TYPES_INT16];
-            items[i].value.value.storageType = UA_VARIANT_DATA_NODELETE;
-            items[i].value.value.data = &datas[i].value.i;
-        }
-        if (datas[i].type == IndustrialProtocolUtils::DataType::DINT) {
-            items[i].value.value.type = &UA_TYPES[UA_TYPES_INT32];
-            items[i].value.value.storageType = UA_VARIANT_DATA_NODELETE;
-            items[i].value.value.data = &datas[i].value.i;
-        }
-        if (datas[i].type == IndustrialProtocolUtils::DataType::UINT) {
-            items[i].value.value.type = &UA_TYPES[UA_TYPES_UINT16];
-            items[i].value.value.storageType = UA_VARIANT_DATA_NODELETE;
-            items[i].value.value.data = &datas[i].value.u;
-        }
-        if (datas[i].type == IndustrialProtocolUtils::DataType::WORD) {
-            items[i].value.value.type = &UA_TYPES[UA_TYPES_UINT16];
-            items[i].value.value.storageType = UA_VARIANT_DATA_NODELETE;
-            items[i].value.value.data = &datas[i].value.u;
-        }
-        if (datas[i].type == IndustrialProtocolUtils::DataType::UDINT) {
-            items[i].value.value.type = &UA_TYPES[UA_TYPES_UINT32];
-            items[i].value.value.storageType = UA_VARIANT_DATA_NODELETE;
-            items[i].value.value.data = &datas[i].value.u;
-        }
-        if (datas[i].type == IndustrialProtocolUtils::DataType::DWORD) {
-            items[i].value.value.type = &UA_TYPES[UA_TYPES_UINT32];
-            items[i].value.value.storageType = UA_VARIANT_DATA_NODELETE;
-            items[i].value.value.data = &datas[i].value.u;
-        }
-        if (datas[i].type == IndustrialProtocolUtils::DataType::REAL) {
-            items[i].value.value.type = &UA_TYPES[UA_TYPES_FLOAT];
-            items[i].value.value.storageType = UA_VARIANT_DATA_NODELETE;
-            items[i].value.value.data = &datas[i].value.f;
-        }
-        items[i].value.hasValue = true;
-    }
-
-    UA_WriteRequest request;
-    UA_WriteRequest_init(&request);
-
-    request.nodesToWrite = items;
-    request.nodesToWriteSize = data_count;
-
-    UA_WriteResponse response = UA_Client_Service_write(client_, request);
-
-    if (response.results != UA_STATUSCODE_GOOD) {
-        Disconnect();
-    }
-
-    UA_WriteResponse_clear(&response);
-    for (int i = 0; i < data_count; i++) { UA_WriteValue_clear(&items[i]); }
+    for (int i = 0; i < j; i++) { UA_WriteValue_clear(&items[i]); }
 }
 
 bool OpcUaClient::Connect() {
@@ -276,7 +149,7 @@ bool OpcUaClient::Connect(const std::string ip, int port) {
     UA_StatusCode status_code = UA_Client_connect(client_, opc_url);
     free(opc_url);
 
-    is_connected_ = status_code = UA_STATUSCODE_GOOD;
+    is_connected_ = status_code == UA_STATUSCODE_GOOD;
     return is_connected_;
 }
 

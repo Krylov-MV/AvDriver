@@ -1,62 +1,47 @@
 #include "modbustcpclient.h"
 
-void ModbusTcpClient::ReadHoldingRegisters(const std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>& config_datas,
-                                           std::vector<IndustrialProtocolUtils::DataResult>& data_result) {
-    if (is_connected_) {
-        if (!config_datas.empty()) {
-            data_result.clear();
+const std::set<std::string> ModbusTcpClient::types = { "INT", "UINT", "WORD", "DINT", "UDINT", "DWORD", "REAL" };
 
-            for (auto config_data : config_datas) {
-                uint16_t tab_reg[125];
-                int start_address = config_data[0].address;
-                int length = config_data[config_data.size() - 1].address + GetLength(config_data[config_data.size() - 1].type) - config_data[0].address;
-
-                int rc = modbus_read_registers(ctx_, start_address, length, tab_reg);
-
-                if (rc == length) {
-                    unsigned int j = 0;
-                    while (j < config_data.size()) {
-                        uint16_t data[2];
-                        IndustrialProtocolUtils::DataResult result;
-                        data[0] = tab_reg[config_data[j].address - start_address];
-                        if (GetLength(config_data[j].type) == 2) { data[1] = tab_reg[config_data[j].address - start_address + 1]; }
-                        result.name = config_data[j].name;
-                        result.type = config_data[j].type;
-                        result.quality = true;
-                        result.value = GetValue(result.type, data);
-                        result.address = config_data[j].address;
-                        data_result.push_back(result);
-                        j++;
-                    }
-                } else {
-                    Disconnect();
-                }
-            }
-        }
+int ModbusTcpClient::TypeLength(const std::string& type) {
+    if (!types.contains(type)) {
+        return 0;
+    }  else if (type == "INT" || type == "UINT" || type == "WORD") {
+        return 1;
+    }  else if (type == "DINT" || type == "UDINT" || type == "DWORD" || type == "REAL") {
+        return 2;
     }
 }
 
-void ModbusTcpClient::ReadHoldingRegisters(const std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>& config_datas,
+float ModbusTcpClient::ToFloat(const uint16_t& high, const uint16_t& low) {
+    union {
+        float f;
+        uint32_t u;
+    } convert;
+
+    convert.u = high << 16 | low;
+
+    return convert.f;
+}
+
+void ModbusTcpClient::ReadHoldingRegisters(const std::vector<ModbusTcpClient::ReadConfig>& configs,
                                            std::map<uint16_t, uint16_t>& holding_registers,
                                            std::mutex& mutex) {
     if (is_connected_) {
-        if (!config_datas.empty()) {
-            for (auto config_data : config_datas) {
-                uint16_t tab_reg[125];
-                int start_address = config_data[0].address;
-                int length = config_data[config_data.size() - 1].address + GetLength(config_data[config_data.size() - 1].type) - config_data[0].address;
+        if (!configs.empty()) {
+            for (auto config : configs) {
+                uint16_t tab_reg[MODBUS_MAX_READ_REGISTERS];
 
-                int rc = modbus_read_registers(ctx_, start_address, length, tab_reg);
+                int rc = modbus_read_registers(ctx_, config.offset, config.length, tab_reg);
 
                 std::lock_guard<std::mutex> lock(mutex);
-                if (rc == length) {
-                    for (unsigned int i = 0; i < length; i++) {
-                        holding_registers[start_address + i] = tab_reg[i];
+                if (rc == config.length) {
+                    for (unsigned int i = 0; i < config.length; i++) {
+                        holding_registers[config.offset + i] = tab_reg[i];
                     }
                 } else {
                     //std::cerr << "Connection failed: " << modbus_strerror(errno) << std::endl;
-                    for (unsigned int i = 0; i < length; i++) {
-                        holding_registers.erase(start_address + i);
+                    for (unsigned int i = 0; i < config.length; i++) {
+                        holding_registers.erase(config.offset + i);
                     }
                     Disconnect();
                 }
@@ -69,16 +54,16 @@ void ModbusTcpClient::WriteHoldingRegisters(const std::vector<std::vector<Indust
     if (is_connected_) {
         if (!config_datas.empty()) {
             for (unsigned long i = 0; i < config_datas.size(); i++) {
-                uint16_t tab_reg[100];
-                int start_address = config_datas[i][0].address;
-                int length = config_datas[i][config_datas[i].size() - 1].address + GetLength(config_datas[i][config_datas[i].size() - 1].type) - config_datas[i][0].address;
+                uint16_t tab_reg[MODBUS_MAX_WRITE_REGISTERS];
+                int offset = config_datas[i][0].offset;
+                int length = config_datas[i][config_datas[i].size() - 1].offset + IndustrialProtocolUtils::GetLength(config_datas[i][config_datas[i].size() - 1].type) - config_datas[i][0].offset;
 
                 //std::cout << "start_address - " << start_address << " lenght - " << lenght << std::endl;
                 for (unsigned long j = 0; j < data[i].size(); j++) {
                     tab_reg[j] = data[i][j];
                 }
 
-                int rc = modbus_write_registers(ctx_, start_address, length, tab_reg);
+                int rc = modbus_write_registers(ctx_, offset, length, tab_reg);
                 if (rc < 0) {
                     Disconnect();
                 }
@@ -117,72 +102,6 @@ void ModbusTcpClient::Disconnect() {
     if (is_connected_) {
         modbus_close(ctx_);
         is_connected_ = false;
-    }
-}
-
-int ModbusTcpClient::GetLength(const IndustrialProtocolUtils::DataType& type) {
-    switch (type)
-    {
-    case IndustrialProtocolUtils::DataType::INT:
-    case IndustrialProtocolUtils::DataType::UINT:
-    case IndustrialProtocolUtils::DataType::WORD:
-        return 1;
-    case IndustrialProtocolUtils::DataType::DINT:
-    case IndustrialProtocolUtils::DataType::UDINT:
-    case IndustrialProtocolUtils::DataType::DWORD:
-    case IndustrialProtocolUtils::DataType::REAL:
-        return 2;
-    default:
-        return 0;
-    }
-}
-
-IndustrialProtocolUtils::Value ModbusTcpClient::GetValue(const IndustrialProtocolUtils::DataType& type, const uint16_t (&data)[2]) {
-    switch (type)
-    {
-    case IndustrialProtocolUtils::DataType::INT:
-        return (IndustrialProtocolUtils::Value) {data[0], 0, 0};
-    case IndustrialProtocolUtils::DataType::UINT:
-    case IndustrialProtocolUtils::DataType::WORD:
-        return (IndustrialProtocolUtils::Value) {0, data[0], 0};
-    case IndustrialProtocolUtils::DataType::DINT:
-        return (IndustrialProtocolUtils::Value) {(data[0] << 16) + data[1], 0, 0};
-    case IndustrialProtocolUtils::DataType::UDINT:
-    case IndustrialProtocolUtils::DataType::DWORD:
-        return (IndustrialProtocolUtils::Value) {0, (uint)(data[0] << 16) + data[1], 0};
-    case IndustrialProtocolUtils::DataType::REAL:
-        return (IndustrialProtocolUtils::Value) {0, 0, modbus_get_float_cdab(data)};
-    default:
-        return (IndustrialProtocolUtils::Value) {0, 0, 0};
-    }
-}
-
-void ModbusTcpClient::GetValue(const IndustrialProtocolUtils::DataType& type, const IndustrialProtocolUtils::Value& value, uint16_t (&data)[2]) {
-    switch (type)
-    {
-    case IndustrialProtocolUtils::DataType::INT:
-        data[0] = value.i;
-        break;
-    case IndustrialProtocolUtils::DataType::UINT:
-    case IndustrialProtocolUtils::DataType::WORD:
-        data[0] = value.u;
-        break;
-    case IndustrialProtocolUtils::DataType::DINT:
-        data[0] = value.i >> 16;
-        data[1] = value.i & 65535;
-        break;
-    case IndustrialProtocolUtils::DataType::UDINT:
-    case IndustrialProtocolUtils::DataType::DWORD:
-        data[0] = value.u >> 16;
-        data[1] = value.u & 65535;
-        break;
-    case IndustrialProtocolUtils::DataType::REAL:
-        modbus_set_float_abcd(value.f, &data[0]);
-        break;
-    default:
-        data[0] = 0;
-        data[1] = 0;
-        break;
     }
 }
 

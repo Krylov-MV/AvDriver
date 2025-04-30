@@ -2,10 +2,8 @@
 #define MODBUSTCPCLIENT_H
 
 #include "industrialprotocolutils.h"
-
-#include <modbus/modbus.h>
-#include <map>
 #include <mutex>
+#include <set>
 
 #pragma once
 
@@ -20,9 +18,24 @@ public:
     }
 
     ~ModbusTcpClient() {
+        std::cout << "destructor" << std::endl;
         should_run_ = false;
         modbus_free(ctx_);
     }
+
+    enum class ModbusMemoryType { DiscreteInputs, Coils, InputRegisters, HoldingRegisters };
+
+    struct DeviceConfig {
+        std::string eth_osn_ip_osn;
+        std::string eth_osn_ip_rez;
+        std::string eth_rez_ip_osn;
+        std::string eth_rez_ip_rez;
+        uint port;
+        uint max_socket_in_eth;
+        uint timeout_reconnect;
+        uint timeout_read_write;
+        bool mapping_full_allow;
+    };
 
     struct Memory {
         std::map<uint16_t, bool> dicrete_inputs;
@@ -31,16 +44,33 @@ public:
         std::map<uint16_t, uint16_t> holding_registers;
     };
 
-    struct DataToModbus {
+    struct ReadConfig {
         int offset;
         int length;
-        uint16_t* value[];
     };
 
-    void ReadHoldingRegisters(const std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>& config_datas, std::vector<IndustrialProtocolUtils::DataResult>& data_result);
-    void ReadHoldingRegisters(const std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>& config_datas, std::map<uint16_t, uint16_t>& holding_registers, std::mutex& mutex);
+    struct WriteConfig {
+        int offset;
+        int length;
+        uint16_t value[MODBUS_MAX_WRITE_REGISTERS];
+    };
+
+    struct WriteReadConfig {
+        int write_offset;
+        int write_length;
+        uint16_t write_value[MODBUS_MAX_WR_WRITE_REGISTERS];
+        int read_offset;
+        int read_length;
+        uint16_t read_value[MODBUS_MAX_WR_READ_REGISTERS];
+    };
+
+    void ReadHoldingRegisters(const std::vector<ModbusTcpClient::ReadConfig>& configs,
+                              std::map<uint16_t, uint16_t>& holding_registers,
+                              std::mutex& mutex);
 
     void WriteHoldingRegisters(const std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>& config_datas, const std::vector<std::vector<uint16_t>>& data);
+
+    static int TypeLength(const std::string& type);
 
     bool CheckConnection();
 
@@ -50,7 +80,7 @@ public:
 
     void Disconnect();
 
-    static int GetLength(const IndustrialProtocolUtils::DataType& type);
+    static float ToFloat(const uint16_t& high, const uint16_t& low);
 
 private:
     std::string ip_;
@@ -58,12 +88,10 @@ private:
     modbus_t* ctx_;
     bool is_connected_;
     bool should_run_;
-
-    IndustrialProtocolUtils::Value GetValue(const IndustrialProtocolUtils::DataType& type, const uint16_t (&data)[2]);
-
-    void GetValue(const IndustrialProtocolUtils::DataType& type, const IndustrialProtocolUtils::Value& value, uint16_t (&data)[2]);
+    static const std::set<std::string> types;
 
     void Stop();
 };
+
 
 #endif // MODBUSTCPCLIENT_H
