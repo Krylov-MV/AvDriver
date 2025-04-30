@@ -1,4 +1,5 @@
 #include <thread>
+#include <memory>
 
 #include "industrialprotocolutils.h"
 #include "modbustcpclient.h"
@@ -118,8 +119,8 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
 
     uint start_address = data_results[0].address;
     for (unsigned int i = 0; i < data_results.size(); i ++) {
-        if (data_results[i].time_previos == 0) { data_results[i].time_previos = data_results[i].time_current; }
-        if (data_results[i].time_current > data_results[i].time_previos) {
+        //if (data_results[i].time_previos == 0) { data_results[i].time_previos = data_results[i].time_current; }
+        if (data_results[i].time_current > data_results[i].time_previos && (data_results[i].quality >= UA_STATUSCODE_GOOD && data_results[i].quality <= UA_STATUSCODE_UNCERTAIN)) {
             //std::cout << data_results[i].time_current << std::endl;
             //std::cout << data_results[i].time_previos << std::endl;
             data_results[i].time_previos = data_results[i].time_current;

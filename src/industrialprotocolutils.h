@@ -5,7 +5,7 @@
 #include <sstream>
 #include <fstream>
 #include <string>
-#include <open62541.h>
+#include <open62541/client.h>
 #include <vector>
 #include <algorithm>
 
@@ -58,7 +58,7 @@ public:
 
     struct DataResult {
         Value value;
-        bool quality;
+        UA_StatusCode quality;
         DataType type;
         uint address;
         std::string name;

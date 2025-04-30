@@ -22,11 +22,12 @@ void OpcUaClient::ReadDatas(const std::vector<IndustrialProtocolUtils::DataConfi
 
     if (response.responseHeader.serviceResult == UA_STATUSCODE_GOOD) {
         for (int i = 0; i < data_count; i++) {
-            if (response.results[i].hasValue) {
+            if (response.results[i].hasValue && (response.results[i].status >= UA_STATUSCODE_GOOD && response.results[i].status <= UA_STATUSCODE_UNCERTAIN)) {
                 data_results[i].address = data_configs[i].address;
                 data_results[i].name = data_configs[i].name;
                 data_results[i].type = data_configs[i].type;
                 data_results[i].time_current = response.results[i].sourceTimestamp;
+                data_results[i].quality = response.results[i].status;
                 switch (data_configs[i].type)
                 {
                 case (IndustrialProtocolUtils::DataType::INT):
@@ -205,7 +206,7 @@ bool OpcUaClient::Connect(const std::string ip, int port) {
     UA_StatusCode status_code = UA_Client_connect(client_, opc_url);
     free(opc_url);
 
-    is_connected_ = status_code = UA_STATUSCODE_GOOD;
+    is_connected_ = status_code == UA_STATUSCODE_GOOD;
     return is_connected_;
 }
 
