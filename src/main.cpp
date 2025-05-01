@@ -179,7 +179,7 @@ void ReadConfig_0_1(ModbusTcpClient::DeviceConfig& modbus_tcp_client_device_conf
                              >> modbus_tcp_client_device_config.eth_osn_ip_osn >> modbus_tcp_client_device_config.eth_osn_ip_rez
                              >> modbus_tcp_client_device_config.eth_rez_ip_osn >> modbus_tcp_client_device_config.eth_rez_ip_rez;
     getline(file, line);
-    std::istringstream(line) >> opc_ua_client_device_config.eth_osn_ip_osn;
+    std::istringstream(line) >> opc_ua_client_device_config.url;
 
     file.close();
 
@@ -257,21 +257,17 @@ int main() {
 
     ModbusTcpClient::Memory modbus_tcp_client_memory;
     std::vector<OpcUaClient::ReadResult> opc_ua_client_read_results;
-std::cout << "тест 1" << std::endl;
+
     std::vector<std::shared_ptr<ModbusTcpClient>> modbus_tcp_client_clients;
     std::mutex modbus_tcp_client_mutex;
-std::cout << "тест 2" << std::endl;
     for (uint i = 0; i < modbus_tcp_client_device_config.max_socket_in_eth * 4; i++) {
         modbus_tcp_client_clients.push_back(std::make_shared<ModbusTcpClient>());
     }
-std::cout << "тест 3" << std::endl;
-opc_ua_client_device_config.eth_osn_ip_osn = "opc.tcp://192.168.111.132:62544";
-    opc_ua_client_device_config.port = 62544;
 
-    OpcUaClient opc_ua_client(opc_ua_client_device_config.eth_osn_ip_osn, opc_ua_client_device_config.port);
+    OpcUaClient opc_ua_client;
 
     //Логика программы
-    std::cout << "Начало выполнения программы" << std::endl;
+    std::cout << "Начало выполнения основной части программы" << std::endl;
     while (true) {
         //Если нет связи с OPC сервером, то нет смысла обрабатывать логику
         if (!opc_ua_client.CheckConnection()) {
