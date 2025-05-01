@@ -12,16 +12,15 @@
 
 class OpcUaClient {
 public:
-    OpcUaClient(const std::string& url)
-        : url_(url), is_connected_(false), should_run_(true) {
+    OpcUaClient(const std::string &ip, int port)
+        : ip_(ip), port_(port), is_connected_(false), should_run_(true) {
         client_ = UA_Client_new();
 
         UA_ClientConfig* config = UA_Client_getConfig(client_);
 
         *config->logging = UA_Log_Stdout_withLevel(UA_LOGLEVEL_FATAL);
-std::cout << "тест 4" << std::endl;
+
         Connect();
-std::cout << "тест 5" << std::endl;
     }
 
     OpcUaClient()
@@ -40,7 +39,8 @@ std::cout << "тест 5" << std::endl;
     }
 
     struct DeviceConfig {
-        std::string url;
+        std::string eth_osn_ip_osn;
+        int port;
         uint timeout_reconnect;
         uint timeout_read_write;
     };
@@ -76,14 +76,15 @@ std::cout << "тест 5" << std::endl;
 
     bool Connect();
 
-    bool Connect(const std::string url);
+    bool Connect(const std::string ip, int port);
 
     void Disconnect();
 
     bool CheckConnection();
 
 private:
-    std::string url_ = "opc.tcp://127.0.0.1:62544";
+    std::string ip_ = "opc.tcp://127.0.0.1:62544";
+    int port_ = 62544;
     UA_Client* client_;
     bool is_connected_;
     bool should_run_;

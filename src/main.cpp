@@ -179,7 +179,7 @@ void ReadConfig_0_1(ModbusTcpClient::DeviceConfig& modbus_tcp_client_device_conf
                              >> modbus_tcp_client_device_config.eth_osn_ip_osn >> modbus_tcp_client_device_config.eth_osn_ip_rez
                              >> modbus_tcp_client_device_config.eth_rez_ip_osn >> modbus_tcp_client_device_config.eth_rez_ip_rez;
     getline(file, line);
-    std::istringstream(line) >> opc_ua_client_device_config.url;
+    std::istringstream(line) >> opc_ua_client_device_config.eth_osn_ip_osn;
 
     file.close();
 
@@ -265,7 +265,10 @@ std::cout << "тест 2" << std::endl;
         modbus_tcp_client_clients.push_back(std::make_shared<ModbusTcpClient>());
     }
 std::cout << "тест 3" << std::endl;
-    OpcUaClient opc_ua_client(opc_ua_client_device_config.url);
+opc_ua_client_device_config.eth_osn_ip_osn = "opc.tcp://192.168.111.132:62544";
+    opc_ua_client_device_config.port = 62544;
+
+    OpcUaClient opc_ua_client(opc_ua_client_device_config.eth_osn_ip_osn, opc_ua_client_device_config.port);
 
     //Логика программы
     std::cout << "Начало выполнения программы" << std::endl;

@@ -133,23 +133,19 @@ void OpcUaClient::Write(std::vector<WriteConfig>& configs) {
 }
 
 bool OpcUaClient::Connect() {
-    url_ = "opc.tcp://127.0.0.1:62544";
-    std::cout << url_ << std::endl;
-    char* opc_url = strdup(url_.c_str());
-    std::cout << "test 2" << std::endl;
+    char* opc_url = strdup(ip_.c_str());
     UA_StatusCode status_code = UA_Client_connect(client_, opc_url);
-    std::cout << "test 3" << std::endl;
     free(opc_url);
-std::cout << "test 4" << std::endl;
+
     is_connected_ = status_code == UA_STATUSCODE_GOOD;
-    std::cout << "test 5" << std::endl;
     return is_connected_;
 }
 
-bool OpcUaClient::Connect(const std::string url) {
-    url_ = url;
+bool OpcUaClient::Connect(const std::string ip, int port) {
+    ip_ = ip;
+    port_ = port;
 
-    char* opc_url = strdup(url_.c_str());
+    char* opc_url = strdup(ip_.c_str());
     UA_StatusCode status_code = UA_Client_connect(client_, opc_url);
     free(opc_url);
 
