@@ -16,6 +16,8 @@ public:
 
         UA_ClientConfig* config = UA_Client_getConfig(client_);
 
+        UA_Client_run_iterate(client_, 100);
+
         *config->logging = UA_Log_Stdout_withLevel(UA_LOGLEVEL_FATAL);
 
         Connect();
@@ -26,6 +28,8 @@ public:
         client_ = UA_Client_new();
 
         UA_ClientConfig* config = UA_Client_getConfig(client_);
+
+        UA_Client_run_iterate(client_, 100);
 
         *config->logging = UA_Log_Stdout_withLevel(UA_LOGLEVEL_FATAL);
     }
