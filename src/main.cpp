@@ -13,20 +13,23 @@ struct DataLinks {
     int offset;
 };
 
-struct Bridge {
-    std::vector<DataLinks> to_modbus;
-    std::vector<DataLinks> to_opc;
+struct BridgeModbusOpc {
+    std::map<std::string, int> to_modbus;
+    std::map<std::string, int> to_opc;
 };
 
 void ThreadModbusTcpClientWriteRead(std::shared_ptr<ModbusTcpClient> client,
                                     const ModbusTcpClient::WriteReadConfigs& write_read_configs,
                                     ModbusTcpClient::Memory& memory,
                                     std::mutex& mutex) {
+    //std::cout << "Выполняется чтение/запись данных Modbus устройства в потоке \n";
+
     client->WriteCoils(write_read_configs.write.coils);
     client->WriteHoldingRegisters(write_read_configs.write.holding_registers);
-    client->ReadDiscreteInputs(write_read_configs.read.holding_registers, memory.discrete_inputs, mutex);
-    client->ReadCoils(write_read_configs.read.holding_registers, memory.coils, mutex);
-    client->ReadInputRegisters(write_read_configs.read.holding_registers, memory.holding_registers, mutex);
+
+    client->ReadDiscreteInputs(write_read_configs.read.discrete_inputs, memory.discrete_inputs, mutex);
+    client->ReadCoils(write_read_configs.read.coils, memory.coils, mutex);
+    client->ReadInputRegisters(write_read_configs.read.input_registers, memory.input_registers, mutex);
     client->ReadHoldingRegisters(write_read_configs.read.holding_registers, memory.holding_registers, mutex);
 }
 
@@ -36,14 +39,13 @@ void ModbusTcpClientRun(std::vector<std::shared_ptr<ModbusTcpClient>> clients,
                         ModbusTcpClient::Memory& memory,
                         std::mutex& mutex) {
     ModbusTcpClient::WriteReadConfigs write_read_configs_;
-
     //Подготовка карты записи Modbus устройства
     if (!write_read_configs.write.coils.empty()) {
         write_read_configs_.write.coils = ModbusTcpClient::PrepareModbusWriteBits(write_read_configs.write.coils, MODBUS_MAX_WRITE_BITS);
     }
 
     //Подготовка карты записи/опроса Modbus устройства
-    if (!device_config.write_read_registers_allow) {
+    //if (!device_config.write_read_registers_allow) {
         if (!write_read_configs.write.holding_registers.empty()) {
             write_read_configs_.write.holding_registers = ModbusTcpClient::PrepareModbusWriteRegisters(write_read_configs.write.holding_registers, MODBUS_MAX_WRITE_REGISTERS);
         }
@@ -54,29 +56,23 @@ void ModbusTcpClientRun(std::vector<std::shared_ptr<ModbusTcpClient>> clients,
         if (!write_read_configs.read.holding_registers.empty()) {
             write_read_configs_.read.holding_registers = ModbusTcpClient::PrepareModbusRead(write_read_configs.read.holding_registers, MODBUS_MAX_READ_REGISTERS);
         }
-    } else {
-    }
+    //} else {
+    //}
 
     //Если карта записи/опроса пуста, то завершаем работу
     if (write_read_configs_.read.discrete_inputs.empty() && write_read_configs_.read.coils.empty() &&
         write_read_configs_.read.input_registers.empty() && write_read_configs_.read.holding_registers.empty() &&
         write_read_configs_.write.coils.empty() && write_read_configs_.write.holding_registers.empty()) { return; }
 
-    //Определение доступных соединений
-    int ethernet_connection_count = 0;
+    //Определение доступных сокетов
+    int socket_count = 0;
     for (int i = 0; i < clients.size(); i++) {
         if (clients[i]->CheckConnection()) {
-            ethernet_connection_count++;
+            socket_count++;
         }
     }
 
-    //Определение доступных сокетов
-    int socket_count = 0;
-    if (device_config.max_socket_in_eth <= 0) {
-        socket_count = ethernet_connection_count;
-    } else {
-        socket_count = device_config.max_socket_in_eth * ethernet_connection_count;
-    }
+    //std::cout << "Количество сокетов для чтения/записи - " << socket_count << "\n";
 
     //Определение количества запросов чтения/запиши на каждый сокет
     int write_read_in_socket_count = write_read_configs_.read.discrete_inputs.size() +
@@ -90,60 +86,80 @@ void ModbusTcpClientRun(std::vector<std::shared_ptr<ModbusTcpClient>> clients,
         write_read_in_socket_count = write_read_in_socket_count / socket_count + 1;
     }
 
+    //std::cout << "Количество бочек для чтения/записи на каждый сокет - " << write_read_in_socket_count << "\n";
+
     //Подготоваливаем карту чтения/записи по количеству запросов чтения/записи на каждый сокет
     std::vector<ModbusTcpClient::WriteReadConfigs> thread_write_read_configs(socket_count);
 
     int num_socket = 0;
     int num_write_read_in_socket = 0;
 
-    for (int i = 0; i < write_read_configs_.write.coils.size(); i++) {
-        thread_write_read_configs[num_socket].write.coils.push_back(write_read_configs_.write.coils[i]);
-        num_write_read_in_socket++;
-        if (thread_write_read_configs[num_socket].write.coils.size() > write_read_in_socket_count) {
-            num_socket++;
-            num_write_read_in_socket = 0;
+    if(!write_read_configs_.write.coils.empty()) {
+        for (int i = 0; i < write_read_configs_.write.coils.size(); i++) {
+            thread_write_read_configs[num_socket].write.coils.push_back(write_read_configs_.write.coils[i]);
+            num_write_read_in_socket++;
+            if (thread_write_read_configs[num_socket].write.coils.size() >= write_read_in_socket_count) {
+                num_socket++;
+                num_write_read_in_socket = 0;
+            }
         }
     }
+
+    if(!write_read_configs_.write.coils.empty()) {
     for (int i = 0; i < write_read_configs_.write.holding_registers.size(); i++) {
         thread_write_read_configs[num_socket].write.holding_registers.push_back(write_read_configs_.write.holding_registers[i]);
         num_write_read_in_socket++;
-        if (thread_write_read_configs[num_socket].write.holding_registers.size() > write_read_in_socket_count) {
+        if (thread_write_read_configs[num_socket].write.holding_registers.size() >= write_read_in_socket_count) {
             num_socket++;
             num_write_read_in_socket = 0;
         }
     }
-    for (int i = 0; i < write_read_configs_.read.discrete_inputs.size(); i++) {
-        thread_write_read_configs[num_socket].read.discrete_inputs.push_back(write_read_configs_.read.discrete_inputs[i]);
-        num_write_read_in_socket++;
-        if (thread_write_read_configs[num_socket].read.discrete_inputs.size() > write_read_in_socket_count) {
-            num_socket++;
-            num_write_read_in_socket = 0;
+    }
+    if(!write_read_configs_.read.discrete_inputs.empty()) {
+        for (int i = 0; i < write_read_configs_.read.discrete_inputs.size(); i++) {
+            thread_write_read_configs[num_socket].read.discrete_inputs.push_back(write_read_configs_.read.discrete_inputs[i]);
+            num_write_read_in_socket++;
+            if (thread_write_read_configs[num_socket].read.discrete_inputs.size() >= write_read_in_socket_count) {
+                num_socket++;
+                num_write_read_in_socket = 0;
+            }
         }
     }
-    for (int i = 0; i < write_read_configs_.read.coils.size(); i++) {
-        thread_write_read_configs[num_socket].read.coils.push_back(write_read_configs_.read.coils[i]);
-        num_write_read_in_socket++;
-        if (thread_write_read_configs[num_socket].read.coils.size() > write_read_in_socket_count) {
-            num_socket++;
-            num_write_read_in_socket = 0;
+    if(!write_read_configs_.read.coils.empty()) {
+        for (int i = 0; i < write_read_configs_.read.coils.size(); i++) {
+            thread_write_read_configs[num_socket].read.coils.push_back(write_read_configs_.read.coils[i]);
+            num_write_read_in_socket++;
+            if (thread_write_read_configs[num_socket].read.coils.size() > write_read_in_socket_count) {
+                num_socket++;
+                num_write_read_in_socket = 0;
+            }
         }
     }
-    for (int i = 0; i < write_read_configs_.read.input_registers.size(); i++) {
-        thread_write_read_configs[num_socket].read.input_registers.push_back(write_read_configs_.read.input_registers[i]);
-        num_write_read_in_socket++;
-        if (thread_write_read_configs[num_socket].read.input_registers.size() > write_read_in_socket_count) {
-            num_socket++;
-            num_write_read_in_socket = 0;
+    if(!write_read_configs_.read.input_registers.empty()) {
+        for (int i = 0; i < write_read_configs_.read.input_registers.size(); i++) {
+            thread_write_read_configs[num_socket].read.input_registers.push_back(write_read_configs_.read.input_registers[i]);
+            num_write_read_in_socket++;
+            if (thread_write_read_configs[num_socket].read.input_registers.size() >= write_read_in_socket_count) {
+                num_socket++;
+                num_write_read_in_socket = 0;
+            }
         }
     }
-    for (int i = 0; i < write_read_configs_.read.holding_registers.size(); i++) {
-        thread_write_read_configs[num_socket].read.holding_registers.push_back(write_read_configs_.read.holding_registers[i]);
-        num_write_read_in_socket++;
-        if (thread_write_read_configs[num_socket].read.holding_registers.size() > write_read_in_socket_count) {
-            num_socket++;
-            num_write_read_in_socket = 0;
+    if(!write_read_configs_.read.holding_registers.empty()) {
+        for (int i = 0; i < write_read_configs_.read.holding_registers.size(); i++) {
+            thread_write_read_configs[num_socket].read.holding_registers.push_back(write_read_configs_.read.holding_registers[i]);
+            num_write_read_in_socket++;
+            if (thread_write_read_configs[num_socket].read.holding_registers.size() >= write_read_in_socket_count) {
+                num_socket++;
+                num_write_read_in_socket = 0;
+            }
         }
     }
+
+    /*for (ModbusTcpClient::ReadConfig& holding_registers : thread_write_read_configs[0].read.holding_registers) {
+        std::cout << holding_registers.offset << std::endl;
+        std::cout << holding_registers.length << std::endl;
+    }*/
 
     //Опрос всех соединений
     std::vector<std::thread> threads;
@@ -160,17 +176,17 @@ void ModbusTcpClientRun(std::vector<std::shared_ptr<ModbusTcpClient>> clients,
 void OpcUaClientRun(OpcUaClient& client,
                     const OpcUaClient::DeviceConfig& device_config,
                     OpcUaClient::WriteReadConfigs& write_read_configs,
-                    std::vector<OpcUaClient::ReadResult>& read_results) {
-    client.Write(write_read_configs.write);
+                    std::map<std::string, OpcUaClient::OpcUaValue>& read_results) {
+    if (!write_read_configs.write.empty()) { client.Write(write_read_configs.write); }
 
-    client.Read(write_read_configs.read, read_results);
+    if (!write_read_configs.read.empty()) { client.Read(write_read_configs.read, read_results); }
 }
 
 void ReadConfig_0_1(ModbusTcpClient::DeviceConfig& modbus_tcp_client_device_config,
                     ModbusTcpClient::WriteReadConfigs& modbus_tcp_client_write_read_configs,
                     OpcUaClient::DeviceConfig& opc_ua_client_device_config,
-                    OpcUaClient::WriteReadConfigs opc_ua_client_write_read_configs,
-                    Bridge bridge) {
+                    OpcUaClient::WriteReadConfigs& opc_ua_client_write_read_configs,
+                    BridgeModbusOpc& bridge_modbus_opc) {
     std::string line;
 
     std::ifstream file("devices.txt");
@@ -204,20 +220,22 @@ void ReadConfig_0_1(ModbusTcpClient::DeviceConfig& modbus_tcp_client_device_conf
         if (ModbusTcpClient::TypeLength(from_type) > 0 && (std::stoi(from_address) >= 0 && std::stoi(from_address) <= 65535) && OpcUaClient::TypeLength(to_type) > 0 && !to_address.empty()) {
             if(from_function == "3") {
                 modbus_tcp_client_write_read_configs.read.holding_registers.push_back({std::stoi(from_address), ModbusTcpClient::TypeLength(from_type)});
-                opc_ua_client_write_read_configs.write.push_back({to_address, to_type});
-                bridge.to_opc.push_back({to_address, std::stoi(from_address)});
+                opc_ua_client_write_read_configs.write.push_back({false, to_address, to_type});
+                bridge_modbus_opc.to_opc[to_address] = std::stoi(from_address);
             }
             if(from_function == "16") {
                 modbus_tcp_client_write_read_configs.write.holding_registers.push_back({std::stoi(from_address), ModbusTcpClient::TypeLength(from_type)});
                 opc_ua_client_write_read_configs.read.push_back({to_address, to_type});
+                bridge_modbus_opc.to_modbus[to_address] = std::stoi(from_address);
             }
             if(from_function == "23") {
                 modbus_tcp_client_write_read_configs.write.holding_registers.push_back({std::stoi(from_address), ModbusTcpClient::TypeLength(from_type)});
                 modbus_tcp_client_write_read_configs.read.holding_registers.push_back({std::stoi(from_address), ModbusTcpClient::TypeLength(from_type)});
-                opc_ua_client_write_read_configs.write.push_back({to_address, to_type});
+                opc_ua_client_write_read_configs.write.push_back({false, to_address, to_type});
                 opc_ua_client_write_read_configs.read.push_back({to_address + ".write", to_type});
 
-                bridge.to_opc.push_back({to_address, std::stoi(from_address)});
+                bridge_modbus_opc.to_opc[to_address] = std::stoi(from_address);
+                bridge_modbus_opc.to_modbus[to_address + ".write"] = std::stoi(from_address);
             }
         }
     }
@@ -240,23 +258,23 @@ void ReadConfig_0_1(ModbusTcpClient::DeviceConfig& modbus_tcp_client_device_conf
 
 int main() {
     //Инициализация/объявления
-    Bridge bridge;
+    BridgeModbusOpc bridge_modbus_opc;
     ModbusTcpClient::DeviceConfig modbus_tcp_client_device_config;
     ModbusTcpClient::WriteReadConfigs modbus_tcp_client_write_read_configs;
     OpcUaClient::DeviceConfig opc_ua_client_device_config;
     OpcUaClient::WriteReadConfigs opc_ua_client_write_read_configs;
 
     //Считывание конфигурации
-    std::cout << "Считывание конфигурации" << std::endl;
+    std::cout << "Считывание конфигурации \n";
     ReadConfig_0_1(modbus_tcp_client_device_config,
                    modbus_tcp_client_write_read_configs,
                    opc_ua_client_device_config,
                    opc_ua_client_write_read_configs,
-                   bridge);
-    std::cout << "Конфигурация считана" << std::endl;
+                   bridge_modbus_opc);
+    std::cout << "Конфигурация считана \n";
 
     ModbusTcpClient::Memory modbus_tcp_client_memory;
-    std::vector<OpcUaClient::ReadResult> opc_ua_client_read_results;
+    std::map<std::string, OpcUaClient::OpcUaValue> opc_ua_client_read_results;
 
     std::vector<std::shared_ptr<ModbusTcpClient>> modbus_tcp_client_clients;
     std::mutex modbus_tcp_client_mutex;
@@ -265,13 +283,14 @@ int main() {
     }
 
     OpcUaClient opc_ua_client;
+    opc_ua_client.SetUrl(opc_ua_client_device_config.url);
 
     //Логика программы
-    std::cout << "Начало выполнения основной части программы" << std::endl;
+    std::cout << "Начало выполнения основной части программы \n";
     while (true) {
         //Если нет связи с OPC сервером, то нет смысла обрабатывать логику
         if (!opc_ua_client.CheckConnection()) {
-            std::cout << "Нет связи с OPC сервером" << std::endl;
+            std::cout << "Нет связи с OPC сервером \n";
             std::this_thread::sleep_for(std::chrono::milliseconds(5000));
             continue;
         }
@@ -325,23 +344,29 @@ int main() {
         }
 
         if (link_is_fail) {
-            std::cout << "Нет связи с Modbus устройством" << std::endl;
+            std::cout << "Нет связи с Modbus устройством \n";
             std::this_thread::sleep_for(std::chrono::milliseconds(5000));
             continue;
         }
 
+        //std::cout << "Выполняется чтение/запись Modbus \n";
+        //Подготовка данных для передачи в Modbus
         ModbusTcpClientRun(modbus_tcp_client_clients,
                            modbus_tcp_client_device_config,
                            modbus_tcp_client_write_read_configs,
                            modbus_tcp_client_memory,
                            modbus_tcp_client_mutex);
 
+        //Подготовка данных для передачи в OPC
+        for (const std::pair<std::string, int>& bridge : bridge_modbus_opc.to_opc) {
+            ;
+        }
         OpcUaClientRun(opc_ua_client,
                        opc_ua_client_device_config,
                        opc_ua_client_write_read_configs,
                        opc_ua_client_read_results);
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        //std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     return 0;
 }

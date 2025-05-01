@@ -1,5 +1,7 @@
 #include "modbustcpclient.h"
 
+#include <iostream>
+
 const std::set<std::string> ModbusTcpClient::types = { "INT", "UINT", "WORD", "DINT", "UDINT", "DWORD", "REAL" };
 
 std::vector<ModbusTcpClient::WriteBitsConfigs> ModbusTcpClient::PrepareModbusWriteBits(const std::vector<ModbusTcpClient::WriteBitsConfigs>& configs, const int& max_length) {
@@ -219,7 +221,6 @@ void ModbusTcpClient::ReadHoldingRegisters(const std::vector<ModbusTcpClient::Re
                 uint16_t tab_reg[MODBUS_MAX_READ_REGISTERS];
 
                 int rc = modbus_read_registers(ctx_, config.offset, config.length, tab_reg);
-
                 std::lock_guard<std::mutex> lock(mutex);
                 if (rc == config.length) {
                     for (unsigned int i = 0; i < config.length; i++) {

@@ -50,6 +50,7 @@ public:
         int offset;
         int length;
         std::vector<uint16_t> value;
+        std::vector<bool> allowed;
     };
 
     struct WriteBitsConfigs {

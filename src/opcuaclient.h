@@ -4,6 +4,7 @@
 #include <open62541/client.h>
 #include <open62541/plugin/log_stdout.h>
 #include <set>
+#include <map>
 #include <vector>
 #include <variant>
 #include <iostream>
@@ -34,6 +35,7 @@ public:
     };
 
     struct WriteConfig {
+        bool allowed;
         std::string node_id;
         std::string type;
         std::variant<int16_t, uint16_t, int32_t, uint32_t, float> value;
@@ -49,16 +51,16 @@ public:
         std::vector<ReadConfig> read;
     };
 
-    struct ReadResult {
+    struct OpcUaValue {
         std::variant<int16_t, uint16_t, int32_t, uint32_t, float> value;
         long source_timestamp;
+        long timestamp;
         uint32_t quality;
-        std::string node_id;
     };
 
     static int TypeLength(const std::string& type);
 
-    void Read(const std::vector<ReadConfig>& configs, std::vector<ReadResult>& results);
+    void Read(const std::vector<ReadConfig>& configs, std::map<std::string, OpcUaValue>& results);
 
     void Write(std::vector<WriteConfig>& configs);
 
@@ -67,6 +69,8 @@ public:
     void Disconnect();
 
     bool CheckConnection();
+
+    void SetUrl(const std::string& url);
 
 private:
     std::string url_ = "opc.tcp://127.0.0.1:62544";
