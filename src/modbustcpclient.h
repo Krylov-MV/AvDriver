@@ -1,9 +1,11 @@
 #ifndef MODBUSTCPCLIENT_H
 #define MODBUSTCPCLIENT_H
 
-#include "industrialprotocolutils.h"
+#include <modbus/modbus.h>
 #include <mutex>
 #include <set>
+#include <vector>
+#include <map>
 
 #pragma once
 
@@ -18,7 +20,6 @@ public:
     }
 
     ~ModbusTcpClient() {
-        std::cout << "destructor" << std::endl;
         should_run_ = false;
         modbus_free(ctx_);
     }
@@ -35,13 +36,26 @@ public:
         uint timeout_reconnect;
         uint timeout_read_write;
         bool mapping_full_allow;
+        bool write_read_registers_allow;
     };
 
     struct Memory {
-        std::map<uint16_t, bool> dicrete_inputs;
+        std::map<uint16_t, bool> discrete_inputs;
         std::map<uint16_t, bool> coils;
         std::map<uint16_t, uint16_t> input_registers;
         std::map<uint16_t, uint16_t> holding_registers;
+    };
+
+    struct WriteRegistersConfig {
+        int offset;
+        int length;
+        std::vector<uint16_t> value;
+    };
+
+    struct WriteBitsConfigs {
+        int offset;
+        int length;
+        std::vector<bool> value;
     };
 
     struct ReadConfig {
@@ -49,26 +63,48 @@ public:
         int length;
     };
 
-    struct WriteConfig {
-        int offset;
-        int length;
-        uint16_t value[MODBUS_MAX_WRITE_REGISTERS];
+    struct WriteConfigs {
+        std::vector<WriteBitsConfigs> coils;
+        std::vector<WriteRegistersConfig> holding_registers;
     };
 
-    struct WriteReadConfig {
-        int write_offset;
-        int write_length;
-        uint16_t write_value[MODBUS_MAX_WR_WRITE_REGISTERS];
-        int read_offset;
-        int read_length;
-        uint16_t read_value[MODBUS_MAX_WR_READ_REGISTERS];
+    struct ReadConfigs {
+        std::vector<ReadConfig> discrete_inputs;
+        std::vector<ReadConfig> coils;
+        std::vector<ReadConfig> input_registers;
+        std::vector<ReadConfig> holding_registers;
     };
 
-    void ReadHoldingRegisters(const std::vector<ModbusTcpClient::ReadConfig>& configs,
-                              std::map<uint16_t, uint16_t>& holding_registers,
+    struct WriteReadConfigs {
+        WriteConfigs write;
+        ReadConfigs read;
+    };
+
+    static std::vector<ModbusTcpClient::WriteBitsConfigs> PrepareModbusWriteBits(const std::vector<ModbusTcpClient::WriteBitsConfigs>& configs, const int& max_length);
+
+    static std::vector<ModbusTcpClient::WriteRegistersConfig> PrepareModbusWriteRegisters(const std::vector<ModbusTcpClient::WriteRegistersConfig>& configs, const int& max_length);
+
+    static std::vector<ModbusTcpClient::ReadConfig> PrepareModbusRead(const std::vector<ModbusTcpClient::ReadConfig>& configs, const int& max_length);
+
+    void WriteCoils(const std::vector<WriteBitsConfigs>& configs);
+
+    void WriteHoldingRegisters(const std::vector<WriteRegistersConfig>& configs);
+
+    void ReadDiscreteInputs(const std::vector<ModbusTcpClient::ReadConfig>& configs,
+                              std::map<uint16_t, bool>& result,
                               std::mutex& mutex);
 
-    void WriteHoldingRegisters(const std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>& config_datas, const std::vector<std::vector<uint16_t>>& data);
+    void ReadCoils(const std::vector<ModbusTcpClient::ReadConfig>& configs,
+                              std::map<uint16_t, bool>& result,
+                              std::mutex& mutex);
+
+    void ReadInputRegisters(const std::vector<ModbusTcpClient::ReadConfig>& configs,
+                              std::map<uint16_t, uint16_t>& result,
+                              std::mutex& mutex);
+
+    void ReadHoldingRegisters(const std::vector<ModbusTcpClient::ReadConfig>& configs,
+                              std::map<uint16_t, uint16_t>& result,
+                              std::mutex& mutex);
 
     static int TypeLength(const std::string& type);
 

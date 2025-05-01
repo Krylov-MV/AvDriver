@@ -1,26 +1,27 @@
 #ifndef OPCUACLIENT_H
 #define OPCUACLIENT_H
 
-//#include "industrialprotocolutils.h"
 #include <open62541/client.h>
 #include <open62541/plugin/log_stdout.h>
 #include <set>
 #include <vector>
 #include <variant>
+#include <iostream>
 
 #pragma once
 
 class OpcUaClient {
 public:
-    OpcUaClient(const std::string &ip, int port)
-        : ip_(ip), port_(port), is_connected_(false), should_run_(true) {
+    OpcUaClient(const std::string& url)
+        : url_(url), is_connected_(false), should_run_(true) {
         client_ = UA_Client_new();
 
         UA_ClientConfig* config = UA_Client_getConfig(client_);
 
         *config->logging = UA_Log_Stdout_withLevel(UA_LOGLEVEL_FATAL);
-
+std::cout << "тест 4" << std::endl;
         Connect();
+std::cout << "тест 5" << std::endl;
     }
 
     OpcUaClient()
@@ -38,6 +39,12 @@ public:
         UA_Client_delete(client_);
     }
 
+    struct DeviceConfig {
+        std::string url;
+        uint timeout_reconnect;
+        uint timeout_read_write;
+    };
+
     struct WriteConfig {
         std::string node_id;
         std::string type;
@@ -49,6 +56,11 @@ public:
         std::string type;
     };
 
+    struct WriteReadConfigs {
+        std::vector<WriteConfig> write;
+        std::vector<ReadConfig> read;
+    };
+
     struct ReadResult {
         std::variant<int16_t, uint16_t, int32_t, uint32_t, float> value;
         long source_timestamp;
@@ -58,21 +70,20 @@ public:
 
     static int TypeLength(const std::string& type);
 
-    void ReadData(const std::vector<ReadConfig>& data_configs, std::vector<ReadResult>& data_results);
+    void Read(const std::vector<ReadConfig>& configs, std::vector<ReadResult>& results);
 
-    void WriteData(std::vector<WriteConfig>& data_to_opc);
+    void Write(std::vector<WriteConfig>& configs);
 
     bool Connect();
 
-    bool Connect(const std::string ip, int port);
+    bool Connect(const std::string url);
 
     void Disconnect();
 
     bool CheckConnection();
 
 private:
-    std::string ip_ = "opc.tcp://127.0.0.1:62544";
-    int port_ = 62544;
+    std::string url_ = "opc.tcp://127.0.0.1:62544";
     UA_Client* client_;
     bool is_connected_;
     bool should_run_;

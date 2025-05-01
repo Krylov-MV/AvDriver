@@ -2,6 +2,78 @@
 
 const std::set<std::string> ModbusTcpClient::types = { "INT", "UINT", "WORD", "DINT", "UDINT", "DWORD", "REAL" };
 
+std::vector<ModbusTcpClient::WriteBitsConfigs> ModbusTcpClient::PrepareModbusWriteBits(const std::vector<ModbusTcpClient::WriteBitsConfigs>& configs, const int& max_length) {
+    std::vector<ModbusTcpClient::WriteBitsConfigs> configs_;
+    std::vector<bool> values;
+
+    int offset = configs[0].offset;
+    int length = configs[0].length;
+    values.push_back(configs[0].value[0]);
+
+
+    for (unsigned int i = 1; i < configs.size(); i++) {
+        if (configs[i].offset - offset + configs[i].length <= max_length) {
+            length = configs[i].offset - offset + configs[i].length;
+            values.push_back(configs[i].value[0]);
+        } else {
+            configs_.push_back({offset, length, values});
+            offset = configs[i].offset;
+            length = configs[i].length;
+        }
+    }
+    configs_.push_back({offset, length, values});
+    return configs_;
+}
+
+std::vector<ModbusTcpClient::WriteRegistersConfig> ModbusTcpClient::PrepareModbusWriteRegisters(const std::vector<ModbusTcpClient::WriteRegistersConfig>& configs, const int& max_length) {
+    std::vector<ModbusTcpClient::WriteRegistersConfig> configs_;
+    std::vector<uint16_t> values;
+
+    int offset = configs[0].offset;
+    int length = configs[0].length;
+    for (const uint16_t& v : configs[0].value) {
+        values.push_back(v);
+    }
+
+    for (unsigned int i = 1; i < configs.size(); i++) {
+        if (configs[i].offset - offset + configs[i].length <= max_length) {
+            length = configs[i].offset - offset + configs[i].length;
+            for (const uint16_t& v : configs[i].value) {
+                values.push_back(v);
+            }
+        } else {
+            configs_.push_back({offset, length, values});
+            offset = configs[i].offset;
+            length = configs[i].length;
+            values.clear();
+            for (const uint16_t& v : configs[i].value) {
+                values.push_back(v);
+            }
+        }
+    }
+    configs_.push_back({offset, length, values});
+    return configs_;
+}
+
+std::vector<ModbusTcpClient::ReadConfig> ModbusTcpClient::PrepareModbusRead(const std::vector<ModbusTcpClient::ReadConfig>& configs, const int& max_length) {
+    std::vector<ModbusTcpClient::ReadConfig> configs_;
+
+    int offset = configs[0].offset;
+    int length = configs[0].length;
+
+    for (unsigned int i = 1; i < configs.size(); i++) {
+        if (configs[i].offset - offset + configs[i].length <= max_length) {
+            length = configs[i].offset - offset + configs[i].length;
+        } else {
+            configs_.push_back({offset, length});
+            offset = configs[i].offset;
+            length = configs[i].length;
+        }
+    }
+    configs_.push_back({offset, length});
+    return configs_;
+}
+
 int ModbusTcpClient::TypeLength(const std::string& type) {
     if (!types.contains(type)) {
         return 0;
@@ -23,8 +95,123 @@ float ModbusTcpClient::ToFloat(const uint16_t& high, const uint16_t& low) {
     return convert.f;
 }
 
+void ModbusTcpClient::WriteCoils(const std::vector<WriteBitsConfigs>& configs) {
+    if (is_connected_) {
+        if (!configs.empty()) {
+            for (auto config : configs) {
+                uint8_t value[MODBUS_MAX_WRITE_BITS];
+                for (int i = 0; i < config.value.size(); i++) { value[i] = config.value[i]; }
+                int rc = modbus_write_bits(ctx_, config.offset, config.length, value);
+
+                if (rc != config.length) {
+                    //std::cerr << "Connection failed: " << modbus_strerror(errno) << std::endl;
+                    Disconnect();
+                }
+            }
+        }
+    }
+}
+
+void ModbusTcpClient::WriteHoldingRegisters(const std::vector<WriteRegistersConfig>& configs) {
+    if (is_connected_) {
+        if (!configs.empty()) {
+            for (auto config : configs) {
+                uint16_t value[MODBUS_MAX_READ_REGISTERS];
+                for (int i = 0; i < config.value.size(); i++) { value[i] = config.value[i]; }
+                int rc = modbus_write_registers(ctx_, config.offset, config.length, value);
+
+                if (rc != config.length) {
+                    //std::cerr << "Connection failed: " << modbus_strerror(errno) << std::endl;
+                    Disconnect();
+                }
+            }
+        }
+    }
+}
+
+void ModbusTcpClient::ReadDiscreteInputs(const std::vector<ModbusTcpClient::ReadConfig>& configs,
+                                           std::map<uint16_t, bool>& result,
+                                           std::mutex& mutex) {
+    if (is_connected_) {
+        if (!configs.empty()) {
+            for (auto config : configs) {
+                uint8_t tab_reg[MODBUS_MAX_READ_BITS];
+
+                int rc = modbus_read_input_bits(ctx_, config.offset, config.length, tab_reg);
+
+                std::lock_guard<std::mutex> lock(mutex);
+                if (rc == config.length) {
+                    for (unsigned int i = 0; i < config.length; i++) {
+                        result[config.offset + i] = tab_reg[i];
+                    }
+                } else {
+                    //std::cerr << "Connection failed: " << modbus_strerror(errno) << std::endl;
+                    for (unsigned int i = 0; i < config.length; i++) {
+                        result.erase(config.offset + i);
+                    }
+                    Disconnect();
+                }
+            }
+        }
+    }
+}
+
+void ModbusTcpClient::ReadCoils(const std::vector<ModbusTcpClient::ReadConfig>& configs,
+                                           std::map<uint16_t, bool>& result,
+                                           std::mutex& mutex) {
+    if (is_connected_) {
+        if (!configs.empty()) {
+            for (auto config : configs) {
+                uint8_t tab_reg[MODBUS_MAX_READ_BITS];
+
+                int rc = modbus_read_bits(ctx_, config.offset, config.length, tab_reg);
+
+                std::lock_guard<std::mutex> lock(mutex);
+                if (rc == config.length) {
+                    for (unsigned int i = 0; i < config.length; i++) {
+                        result[config.offset + i] = tab_reg[i];
+                    }
+                } else {
+                    //std::cerr << "Connection failed: " << modbus_strerror(errno) << std::endl;
+                    for (unsigned int i = 0; i < config.length; i++) {
+                        result.erase(config.offset + i);
+                    }
+                    Disconnect();
+                }
+            }
+        }
+    }
+}
+
+void ModbusTcpClient::ReadInputRegisters(const std::vector<ModbusTcpClient::ReadConfig>& configs,
+                                           std::map<uint16_t, uint16_t>& result,
+                                           std::mutex& mutex) {
+    if (is_connected_) {
+        if (!configs.empty()) {
+            for (auto config : configs) {
+                uint16_t tab_reg[MODBUS_MAX_READ_REGISTERS];
+
+                int rc = modbus_read_input_registers(ctx_, config.offset, config.length, tab_reg);
+
+                std::lock_guard<std::mutex> lock(mutex);
+                if (rc == config.length) {
+                    for (unsigned int i = 0; i < config.length; i++) {
+                        result[config.offset + i] = tab_reg[i];
+                    }
+                } else {
+                    //std::cerr << "Connection failed: " << modbus_strerror(errno) << std::endl;
+                    for (unsigned int i = 0; i < config.length; i++) {
+                        result.erase(config.offset + i);
+                    }
+                    Disconnect();
+                }
+            }
+        }
+    }
+}
+
 void ModbusTcpClient::ReadHoldingRegisters(const std::vector<ModbusTcpClient::ReadConfig>& configs,
-                                           std::map<uint16_t, uint16_t>& holding_registers,
+                                           std::map<uint16_t, uint16_t>& result,
                                            std::mutex& mutex) {
     if (is_connected_) {
         if (!configs.empty()) {
@@ -36,35 +223,13 @@ void ModbusTcpClient::ReadHoldingRegisters(const std::vector<ModbusTcpClient::Re
                 std::lock_guard<std::mutex> lock(mutex);
                 if (rc == config.length) {
                     for (unsigned int i = 0; i < config.length; i++) {
-                        holding_registers[config.offset + i] = tab_reg[i];
+                        result[config.offset + i] = tab_reg[i];
                     }
                 } else {
                     //std::cerr << "Connection failed: " << modbus_strerror(errno) << std::endl;
                     for (unsigned int i = 0; i < config.length; i++) {
-                        holding_registers.erase(config.offset + i);
+                        result.erase(config.offset + i);
                     }
-                    Disconnect();
-                }
-            }
-        }
-    }
-}
-
-void ModbusTcpClient::WriteHoldingRegisters(const std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>& config_datas, const std::vector<std::vector<uint16_t>>& data) {
-    if (is_connected_) {
-        if (!config_datas.empty()) {
-            for (unsigned long i = 0; i < config_datas.size(); i++) {
-                uint16_t tab_reg[MODBUS_MAX_WRITE_REGISTERS];
-                int offset = config_datas[i][0].offset;
-                int length = config_datas[i][config_datas[i].size() - 1].offset + IndustrialProtocolUtils::GetLength(config_datas[i][config_datas[i].size() - 1].type) - config_datas[i][0].offset;
-
-                //std::cout << "start_address - " << start_address << " lenght - " << lenght << std::endl;
-                for (unsigned long j = 0; j < data[i].size(); j++) {
-                    tab_reg[j] = data[i][j];
-                }
-
-                int rc = modbus_write_registers(ctx_, offset, length, tab_reg);
-                if (rc < 0) {
                     Disconnect();
                 }
             }

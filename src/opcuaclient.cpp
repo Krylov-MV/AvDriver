@@ -12,7 +12,7 @@ int OpcUaClient::TypeLength(const std::string& type) {
     }
 }
 
-void OpcUaClient::ReadData(const std::vector<ReadConfig>& configs, std::vector<ReadResult>& results) {
+void OpcUaClient::Read(const std::vector<ReadConfig>& configs, std::vector<ReadResult>& results) {
     int data_count = configs.size();
     UA_ReadValueId items[data_count];
 
@@ -66,8 +66,8 @@ void OpcUaClient::ReadData(const std::vector<ReadConfig>& configs, std::vector<R
     UA_ReadResponse_clear(&response);
 }
 
-void OpcUaClient::WriteData(std::vector<WriteConfig>& data_to_opc) {
-    int data_count = data_to_opc.size();
+void OpcUaClient::Write(std::vector<WriteConfig>& configs) {
+    int data_count = configs.size();
 
     UA_WriteRequest request;
     UA_WriteRequest_init(&request);
@@ -75,40 +75,40 @@ void OpcUaClient::WriteData(std::vector<WriteConfig>& data_to_opc) {
 
     int j = 0;
     for (int i = 0; i < data_count; i++) {
-        if (types.contains(data_to_opc[i].type)) {
+        if (types.contains(configs[i].type)) {
             UA_WriteValue_init(&items[j]);
 
-            items[j].nodeId = UA_NODEID_STRING(1, strdup(data_to_opc[i].node_id.c_str()));
+            items[j].nodeId = UA_NODEID_STRING(1, strdup(configs[i].node_id.c_str()));
             items[j].attributeId = UA_ATTRIBUTEID_VALUE;
 
-            if (data_to_opc[i].type == "INT") {
+            if (configs[i].type == "INT") {
                 items[j].value.value.type = &UA_TYPES[UA_TYPES_INT16];
-                items[j].value.value.storageType = UA_VARIANT_DATA_NODELETE;
-                int16_t& value = std::get<int16_t>(data_to_opc[i].value);
+                items[j].value.value.storageType = UA_VARIANT_DATA;
+                int16_t& value = std::get<int16_t>(configs[i].value);
                 items[j].value.value.data = &value;
             }
-            if (data_to_opc[i].type == "DINT") {
+            if (configs[i].type == "DINT") {
                 items[j].value.value.type = &UA_TYPES[UA_TYPES_INT32];
-                items[j].value.value.storageType = UA_VARIANT_DATA_NODELETE;
-                int32_t& value = std::get<int32_t>(data_to_opc[i].value);
+                items[j].value.value.storageType = UA_VARIANT_DATA;
+                int32_t& value = std::get<int32_t>(configs[i].value);
                 items[j].value.value.data = &value;
             }
-             if (data_to_opc[i].type == "UINT" || data_to_opc[i].type == "WORD") {
+             if (configs[i].type == "UINT" || configs[i].type == "WORD") {
                 items[j].value.value.type = &UA_TYPES[UA_TYPES_UINT16];
-                items[j].value.value.storageType = UA_VARIANT_DATA_NODELETE;
-                uint16_t& value = std::get<uint16_t>(data_to_opc[i].value);
+                items[j].value.value.storageType = UA_VARIANT_DATA;
+                uint16_t& value = std::get<uint16_t>(configs[i].value);
                 items[j].value.value.data = &value;
             }
-            if (data_to_opc[i].type == "UDINT" || data_to_opc[i].type == "DWORD") {
+            if (configs[i].type == "UDINT" || configs[i].type == "DWORD") {
                 items[j].value.value.type = &UA_TYPES[UA_TYPES_UINT32];
-                items[j].value.value.storageType = UA_VARIANT_DATA_NODELETE;
-                uint32_t& value = std::get<uint32_t>(data_to_opc[i].value);
+                items[j].value.value.storageType = UA_VARIANT_DATA;
+                uint32_t& value = std::get<uint32_t>(configs[i].value);
                 items[j].value.value.data = &value;
             }
-            if (data_to_opc[i].type == "REAL") {
+            if (configs[i].type == "REAL") {
                 items[j].value.value.type = &UA_TYPES[UA_TYPES_FLOAT];
-                items[j].value.value.storageType = UA_VARIANT_DATA_NODELETE;
-                float& value = std::get<float>(data_to_opc[i].value);
+                items[j].value.value.storageType = UA_VARIANT_DATA;
+                float& value = std::get<float>(configs[i].value);
                 items[j].value.value.data = &value;
             }
 
@@ -133,19 +133,23 @@ void OpcUaClient::WriteData(std::vector<WriteConfig>& data_to_opc) {
 }
 
 bool OpcUaClient::Connect() {
-    char* opc_url = strdup(ip_.c_str());
+    url_ = "opc.tcp://127.0.0.1:62544";
+    std::cout << url_ << std::endl;
+    char* opc_url = strdup(url_.c_str());
+    std::cout << "test 2" << std::endl;
     UA_StatusCode status_code = UA_Client_connect(client_, opc_url);
+    std::cout << "test 3" << std::endl;
     free(opc_url);
-
+std::cout << "test 4" << std::endl;
     is_connected_ = status_code == UA_STATUSCODE_GOOD;
+    std::cout << "test 5" << std::endl;
     return is_connected_;
 }
 
-bool OpcUaClient::Connect(const std::string ip, int port) {
-    ip_ = ip;
-    port_ = port;
+bool OpcUaClient::Connect(const std::string url) {
+    url_ = url;
 
-    char* opc_url = strdup(ip_.c_str());
+    char* opc_url = strdup(url_.c_str());
     UA_StatusCode status_code = UA_Client_connect(client_, opc_url);
     free(opc_url);
 

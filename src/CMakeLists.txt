@@ -13,8 +13,6 @@ add_executable(AvDriver
     main.cpp
     modbustcpclient.cpp
     modbustcpclient.h
-    industrialprotocolutils.cpp
-    industrialprotocolutils.h
     opcuaclient.cpp
     opcuaclient.h)
 
