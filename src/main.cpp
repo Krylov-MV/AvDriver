@@ -182,6 +182,32 @@ void OpcUaClientRun(OpcUaClient& client,
     if (!write_read_configs.read.empty()) { client.Read(write_read_configs.read, read_results); }
 }
 
+std::vector<std::string> Split(const std::string &str, const char delimiter) {
+    std::vector<std::string> tokens;
+    std::string token;
+
+    std::stringstream ss(str);
+    while (std::getline(ss, token, delimiter)) {
+        tokens.push_back(token);
+    }
+
+    return tokens;
+}
+
+bool IsIPAddress(const std::string& ip){
+    std::vector<std::string> tokens = Split(ip, '.');
+
+    if (tokens.size() != 4) return false;
+    for (const std::string& str : tokens) {
+        for (const char& c : str) {
+            if (!isdigit(c)) return false;
+        }
+        int value = stoi(str);
+        if (value < 0 || value > 255) return false;
+    }
+    return true;
+}
+
 void ReadConfig_0_1(ModbusTcpClient::DeviceConfig& modbus_tcp_client_device_config,
                     ModbusTcpClient::WriteReadConfigs& modbus_tcp_client_write_read_configs,
                     OpcUaClient::DeviceConfig& opc_ua_client_device_config,
@@ -194,6 +220,12 @@ void ReadConfig_0_1(ModbusTcpClient::DeviceConfig& modbus_tcp_client_device_conf
     std::istringstream(line) >> modbus_tcp_client_device_config.max_socket_in_eth >> modbus_tcp_client_device_config.port
                              >> modbus_tcp_client_device_config.eth_osn_ip_osn >> modbus_tcp_client_device_config.eth_osn_ip_rez
                              >> modbus_tcp_client_device_config.eth_rez_ip_osn >> modbus_tcp_client_device_config.eth_rez_ip_rez;
+
+    if (!IsIPAddress(modbus_tcp_client_device_config.eth_osn_ip_osn)) modbus_tcp_client_device_config.eth_osn_ip_osn.clear();
+    if (!IsIPAddress(modbus_tcp_client_device_config.eth_osn_ip_rez)) modbus_tcp_client_device_config.eth_osn_ip_rez.clear();
+    if (!IsIPAddress(modbus_tcp_client_device_config.eth_rez_ip_osn)) modbus_tcp_client_device_config.eth_rez_ip_osn.clear();
+    if (!IsIPAddress(modbus_tcp_client_device_config.eth_rez_ip_rez)) modbus_tcp_client_device_config.eth_rez_ip_rez.clear();
+
     getline(file, line);
     std::istringstream(line) >> opc_ua_client_device_config.url;
 
@@ -297,15 +329,17 @@ int main() {
         //Если нет связи с Modbus устройством, то нет смысла обрабатывать логику
         bool link_is_fail = true;
         uint j = 0;
-        if (!modbus_tcp_client_clients[j]->CheckConnection()) {
-            if (modbus_tcp_client_clients[j]->Connect(modbus_tcp_client_device_config.eth_osn_ip_osn, modbus_tcp_client_device_config.port)) {
-                j++;
-                for (uint i = 1; i < modbus_tcp_client_device_config.max_socket_in_eth; i++) {
-                    if (modbus_tcp_client_clients[j]->Connect(modbus_tcp_client_device_config.eth_osn_ip_osn, modbus_tcp_client_device_config.port)) { j++; }
+        if (modbus_tcp_client_device_config.eth_osn_ip_osn.length()){
+            if (!modbus_tcp_client_clients[j]->CheckConnection()) {
+                if (modbus_tcp_client_clients[j]->Connect(modbus_tcp_client_device_config.eth_osn_ip_osn, modbus_tcp_client_device_config.port)) {
+                    j++;
+                    for (uint i = 1; i < modbus_tcp_client_device_config.max_socket_in_eth; i++) {
+                        if (modbus_tcp_client_clients[j]->Connect(modbus_tcp_client_device_config.eth_osn_ip_osn, modbus_tcp_client_device_config.port)) { j++; }
+                    }
                 }
             }
         }
-        if (!modbus_tcp_client_device_config.eth_osn_ip_rez.empty()){
+        if (modbus_tcp_client_device_config.eth_osn_ip_rez.length()){
             if (!modbus_tcp_client_clients[j]->CheckConnection()) {
                 if (modbus_tcp_client_clients[j]->Connect(modbus_tcp_client_device_config.eth_osn_ip_rez, modbus_tcp_client_device_config.port)) {
                     j++;
@@ -315,7 +349,7 @@ int main() {
                 }
             }
         }
-        if (!modbus_tcp_client_device_config.eth_rez_ip_osn.empty()){
+        if (modbus_tcp_client_device_config.eth_rez_ip_osn.length()){
             if (!modbus_tcp_client_clients[j]->CheckConnection()) {
                 if (modbus_tcp_client_clients[j]->Connect(modbus_tcp_client_device_config.eth_rez_ip_osn, modbus_tcp_client_device_config.port)) {
                     j++;
@@ -325,7 +359,7 @@ int main() {
                 }
             }
         }
-        if (!modbus_tcp_client_device_config.eth_rez_ip_rez.empty()){
+        if (modbus_tcp_client_device_config.eth_rez_ip_rez.length()){
             if (!modbus_tcp_client_clients[j]->CheckConnection()) {
                 if (modbus_tcp_client_clients[j]->Connect(modbus_tcp_client_device_config.eth_rez_ip_rez, modbus_tcp_client_device_config.port)) {
                     j++;

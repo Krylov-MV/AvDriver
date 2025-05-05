@@ -4,8 +4,8 @@
 
 const std::set<std::string> ModbusTcpClient::types = { "INT", "UINT", "WORD", "DINT", "UDINT", "DWORD", "REAL" };
 
-std::vector<ModbusTcpClient::WriteBitsConfigs> ModbusTcpClient::PrepareModbusWriteBits(const std::vector<ModbusTcpClient::WriteBitsConfigs>& configs, const int& max_length) {
-    std::vector<ModbusTcpClient::WriteBitsConfigs> configs_;
+std::vector<ModbusTcpClient::WriteBitsConfigs> ModbusTcpClient::PrepareModbusWriteBits(const std::vector<WriteBitsConfigs>& configs, const int& max_length) {
+    std::vector<WriteBitsConfigs> configs_;
     std::vector<bool> values;
 
     int offset = configs[0].offset;
@@ -27,8 +27,8 @@ std::vector<ModbusTcpClient::WriteBitsConfigs> ModbusTcpClient::PrepareModbusWri
     return configs_;
 }
 
-std::vector<ModbusTcpClient::WriteRegistersConfig> ModbusTcpClient::PrepareModbusWriteRegisters(const std::vector<ModbusTcpClient::WriteRegistersConfig>& configs, const int& max_length) {
-    std::vector<ModbusTcpClient::WriteRegistersConfig> configs_;
+std::vector<ModbusTcpClient::WriteRegistersConfig> ModbusTcpClient::PrepareModbusWriteRegisters(const std::vector<WriteRegistersConfig>& configs, const int& max_length) {
+    std::vector<WriteRegistersConfig> configs_;
     std::vector<uint16_t> values;
 
     int offset = configs[0].offset;
@@ -57,7 +57,7 @@ std::vector<ModbusTcpClient::WriteRegistersConfig> ModbusTcpClient::PrepareModbu
     return configs_;
 }
 
-std::vector<ModbusTcpClient::ReadConfig> ModbusTcpClient::PrepareModbusRead(const std::vector<ModbusTcpClient::ReadConfig>& configs, const int& max_length) {
+std::vector<ModbusTcpClient::ReadConfig> ModbusTcpClient::PrepareModbusRead(const std::vector<ReadConfig>& configs, const int& max_length) {
     std::vector<ModbusTcpClient::ReadConfig> configs_;
 
     int offset = configs[0].offset;
@@ -131,7 +131,7 @@ void ModbusTcpClient::WriteHoldingRegisters(const std::vector<WriteRegistersConf
     }
 }
 
-void ModbusTcpClient::ReadDiscreteInputs(const std::vector<ModbusTcpClient::ReadConfig>& configs,
+void ModbusTcpClient::ReadDiscreteInputs(const std::vector<ReadConfig>& configs,
                                            std::map<uint16_t, bool>& result,
                                            std::mutex& mutex) {
     if (is_connected_) {
@@ -158,7 +158,7 @@ void ModbusTcpClient::ReadDiscreteInputs(const std::vector<ModbusTcpClient::Read
     }
 }
 
-void ModbusTcpClient::ReadCoils(const std::vector<ModbusTcpClient::ReadConfig>& configs,
+void ModbusTcpClient::ReadCoils(const std::vector<ReadConfig>& configs,
                                            std::map<uint16_t, bool>& result,
                                            std::mutex& mutex) {
     if (is_connected_) {
@@ -185,7 +185,7 @@ void ModbusTcpClient::ReadCoils(const std::vector<ModbusTcpClient::ReadConfig>& 
     }
 }
 
-void ModbusTcpClient::ReadInputRegisters(const std::vector<ModbusTcpClient::ReadConfig>& configs,
+void ModbusTcpClient::ReadInputRegisters(const std::vector<ReadConfig>& configs,
                                            std::map<uint16_t, uint16_t>& result,
                                            std::mutex& mutex) {
     if (is_connected_) {
@@ -212,7 +212,7 @@ void ModbusTcpClient::ReadInputRegisters(const std::vector<ModbusTcpClient::Read
     }
 }
 
-void ModbusTcpClient::ReadHoldingRegisters(const std::vector<ModbusTcpClient::ReadConfig>& configs,
+void ModbusTcpClient::ReadHoldingRegisters(const std::vector<ReadConfig>& configs,
                                            std::map<uint16_t, uint16_t>& result,
                                            std::mutex& mutex) {
     if (is_connected_) {

@@ -81,29 +81,29 @@ public:
         ReadConfigs read;
     };
 
-    static std::vector<ModbusTcpClient::WriteBitsConfigs> PrepareModbusWriteBits(const std::vector<ModbusTcpClient::WriteBitsConfigs>& configs, const int& max_length);
+    static std::vector<WriteBitsConfigs> PrepareModbusWriteBits(const std::vector<WriteBitsConfigs>& configs, const int& max_length);
 
-    static std::vector<ModbusTcpClient::WriteRegistersConfig> PrepareModbusWriteRegisters(const std::vector<ModbusTcpClient::WriteRegistersConfig>& configs, const int& max_length);
+    static std::vector<WriteRegistersConfig> PrepareModbusWriteRegisters(const std::vector<WriteRegistersConfig>& configs, const int& max_length);
 
-    static std::vector<ModbusTcpClient::ReadConfig> PrepareModbusRead(const std::vector<ModbusTcpClient::ReadConfig>& configs, const int& max_length);
+    static std::vector<ReadConfig> PrepareModbusRead(const std::vector<ReadConfig>& configs, const int& max_length);
 
     void WriteCoils(const std::vector<WriteBitsConfigs>& configs);
 
     void WriteHoldingRegisters(const std::vector<WriteRegistersConfig>& configs);
 
-    void ReadDiscreteInputs(const std::vector<ModbusTcpClient::ReadConfig>& configs,
+    void ReadDiscreteInputs(const std::vector<ReadConfig>& configs,
                               std::map<uint16_t, bool>& result,
                               std::mutex& mutex);
 
-    void ReadCoils(const std::vector<ModbusTcpClient::ReadConfig>& configs,
+    void ReadCoils(const std::vector<ReadConfig>& configs,
                               std::map<uint16_t, bool>& result,
                               std::mutex& mutex);
 
-    void ReadInputRegisters(const std::vector<ModbusTcpClient::ReadConfig>& configs,
+    void ReadInputRegisters(const std::vector<ReadConfig>& configs,
                               std::map<uint16_t, uint16_t>& result,
                               std::mutex& mutex);
 
-    void ReadHoldingRegisters(const std::vector<ModbusTcpClient::ReadConfig>& configs,
+    void ReadHoldingRegisters(const std::vector<ReadConfig>& configs,
                               std::map<uint16_t, uint16_t>& result,
                               std::mutex& mutex);
 
