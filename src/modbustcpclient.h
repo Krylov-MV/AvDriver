@@ -20,7 +20,6 @@ public:
 
     ~ModbusTcpClient() {
         should_run_ = false;
-        Disconnect();
         modbus_free(ctx_);
     }
 

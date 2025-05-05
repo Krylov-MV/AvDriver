@@ -2,7 +2,8 @@
 #define OPCUACLIENT_H
 
 #include "industrialprotocolutils.h"
-#include <open62541.h>
+#include <open62541/client.h>
+#include <open62541/plugin/log_stdout.h>
 #include <vector>
 
 #pragma once
@@ -14,11 +15,10 @@ public:
         client_ = UA_Client_new();
 
         UA_ClientConfig* config = UA_Client_getConfig(client_);
-        UA_ClientConfig_setDefault(config);
 
-        config->logger = UA_Log_Stdout_withLevel(UA_LOGLEVEL_FATAL);
-        config->securityMode = UA_MESSAGESECURITYMODE_NONE;
-        config->securityPolicyUri = UA_STRING_ALLOC("http://opcfoundation.org/UA/SecurityPolicy#None");
+        UA_Client_run_iterate(client_, 100);
+
+        *config->logging = UA_Log_Stdout_withLevel(UA_LOGLEVEL_FATAL);
 
         Connect();
     }
@@ -28,11 +28,10 @@ public:
         client_ = UA_Client_new();
 
         UA_ClientConfig* config = UA_Client_getConfig(client_);
-        UA_ClientConfig_setDefault(config);
 
-        config->logger = UA_Log_Stdout_withLevel(UA_LOGLEVEL_FATAL);
-        config->securityMode = UA_MESSAGESECURITYMODE_NONE;
-        config->securityPolicyUri = UA_STRING_ALLOC("http://opcfoundation.org/UA/SecurityPolicy#None");
+        UA_Client_run_iterate(client_, 100);
+
+        *config->logging = UA_Log_Stdout_withLevel(UA_LOGLEVEL_FATAL);
     }
 
     ~OpcUaClient() {

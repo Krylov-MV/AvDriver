@@ -5,7 +5,7 @@
 #include <sstream>
 #include <fstream>
 #include <string>
-#include <open62541.h>
+#include <open62541/client.h>
 #include <vector>
 #include <algorithm>
 
@@ -20,16 +20,16 @@ public:
     enum class ModbusEthWorkType { ONE_ETH_OSN_OR_ONE_ETH_REZ, ONE_ETH_OSN_AND_ONE_ETH_REZ, TWO_ETH_OSN_OR_TWO_ETH_REZ, ALL_ETH };
 
     struct ModbusTcpDeviceConfig {
-        std::string eth_osn_ip_osn;
-        std::string eth_osn_ip_rez;
-        std::string eth_rez_ip_osn;
-        std::string eth_rez_ip_rez;
-        uint port;
+        std::string eth_osn_ip_osn = "";
+        std::string eth_osn_ip_rez = "";
+        std::string eth_rez_ip_osn = "";
+        std::string eth_rez_ip_rez = "";
+        uint port = 502;
         ModbusEthWorkType eth_work_type = ModbusEthWorkType::ONE_ETH_OSN_OR_ONE_ETH_REZ;
-        uint max_socket_in_eth;
-        uint timeout_reconnect;
-        uint timeout_read_write;
-        bool mapping_full_allow;
+        uint max_socket_in_eth = 2;
+        uint timeout_reconnect = 5000;
+        uint timeout_read_write = 10;
+        bool mapping_full_allow = true;
     };
 
     struct OpcUaDeviceConfig {
@@ -58,7 +58,7 @@ public:
 
     struct DataResult {
         Value value;
-        bool quality;
+        UA_StatusCode quality;
         DataType type;
         uint address;
         std::string name;

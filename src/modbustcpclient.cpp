@@ -36,19 +36,19 @@ void ModbusTcpClient::ReadHoldingRegisters(const std::vector<std::vector<Industr
 }
 
 void ModbusTcpClient::WriteHoldingRegisters(const std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>& config_datas, const std::vector<std::vector<uint16_t>>& data) {
-    std::cout << "write" << std::endl;
     if (is_connected_) {
         if (!config_datas.empty()) {
             for (unsigned long i = 0; i < config_datas.size(); i++) {
                 uint16_t tab_reg[100];
-                int start = config_datas[i][0].address;
+                int start_address = config_datas[i][0].address;
                 int lenght = config_datas[i][config_datas[i].size() - 1].address + GetLength(config_datas[i][config_datas[i].size() - 1].type) - config_datas[i][0].address;
 
+                //std::cout << "start_address - " << start_address << " lenght - " << lenght << std::endl;
                 for (unsigned long j = 0; j < data[i].size(); j++) {
                     tab_reg[j] = data[i][j];
                 }
 
-                int rc = modbus_write_registers(ctx_, start, lenght, tab_reg);
+                int rc = modbus_write_registers(ctx_, start_address, lenght, tab_reg);
                 if (rc < 0) {
                     Disconnect();
                 }
@@ -134,21 +134,27 @@ void ModbusTcpClient::GetValue(const IndustrialProtocolUtils::DataType& type, co
     {
     case IndustrialProtocolUtils::DataType::INT:
         data[0] = value.i;
+        break;
     case IndustrialProtocolUtils::DataType::UINT:
     case IndustrialProtocolUtils::DataType::WORD:
         data[0] = value.u;
+        break;
     case IndustrialProtocolUtils::DataType::DINT:
         data[0] = value.i >> 16;
         data[1] = value.i & 65535;
+        break;
     case IndustrialProtocolUtils::DataType::UDINT:
     case IndustrialProtocolUtils::DataType::DWORD:
         data[0] = value.u >> 16;
         data[1] = value.u & 65535;
+        break;
     case IndustrialProtocolUtils::DataType::REAL:
         modbus_set_float_abcd(value.f, &data[0]);
+        break;
     default:
         data[0] = 0;
         data[1] = 0;
+        break;
     }
 }
 
