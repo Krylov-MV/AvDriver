@@ -5,7 +5,7 @@
 #include <sstream>
 #include <fstream>
 #include <string>
-#include <open62541/client.h>
+#include <open62541.h>
 #include <vector>
 #include <algorithm>
 

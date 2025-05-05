@@ -1,21 +1,17 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(AvDriver LANGUAGES CXX VERSION 0.2)
+project(AvDriver LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Threads REQUIRED)
-find_package(open62541 REQUIRED)
-find_library(libmodbus modbus REQUIRED)
+find_package(open62541 REQUIRED COMPONENTS Events FullNamespace)
 
-add_executable(AvDriver
-    main.cpp
-    modbustcpclient.cpp
-    modbustcpclient.h
-    industrialprotocolutils.cpp
-    industrialprotocolutils.h
-    opcuaclient.cpp
-    opcuaclient.h)
+add_executable(AvDriver main.cpp modbustcpclient.cpp modbustcpclient.h industrialprotocolutils.cpp industrialprotocolutils.h opcuaclient.cpp opcuaclient.h)
 
-target_link_libraries(AvDriver ${libmodbus} open62541)
+target_link_libraries(AvDriver libmodbus.so open62541::open62541)
+
+target_link_libraries(AvDriver
+    ${CMAKE_THREAD_LIBS_INIT}
+)

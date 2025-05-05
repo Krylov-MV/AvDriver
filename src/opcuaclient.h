@@ -2,8 +2,7 @@
 #define OPCUACLIENT_H
 
 #include "industrialprotocolutils.h"
-#include <open62541/client.h>
-#include <open62541/plugin/log_stdout.h>
+#include <open62541.h>
 #include <vector>
 
 #pragma once

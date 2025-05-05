@@ -1,10 +1,8 @@
 #include <thread>
-#include <memory>
 
 #include "industrialprotocolutils.h"
 #include "modbustcpclient.h"
 #include "opcuaclient.h"
-#include "rtm64var.h"
 
 void ThreadModbusTcpClientRead(std::shared_ptr<ModbusTcpClient> modbus_tcp_client, std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>& config_datas, std::vector<IndustrialProtocolUtils::DataResult>& data_result)
 {
