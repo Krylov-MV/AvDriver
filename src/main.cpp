@@ -275,15 +275,17 @@ int main() {
         //Если нет связи с Modbus устройством, то нет смысла обрабатывать логику
         bool link_is_fail = true;
         uint j = 0;
-        if (!modbus_tcp_clients[j]->CheckConnection()) {
-            if (modbus_tcp_clients[j]->Connect(modbus_tcp_device_config.eth_osn_ip_osn, modbus_tcp_device_config.port)) {
-                j++;
-                for (uint i = 1; i < modbus_tcp_device_config.max_socket_in_eth; i++) {
-                    if (modbus_tcp_clients[j]->Connect(modbus_tcp_device_config.eth_osn_ip_osn, modbus_tcp_device_config.port)) { j++; }
+        if (modbus_tcp_device_config.eth_osn_ip_osn.size() > 7){
+            if (!modbus_tcp_clients[j]->CheckConnection()) {
+                if (modbus_tcp_clients[j]->Connect(modbus_tcp_device_config.eth_osn_ip_osn, modbus_tcp_device_config.port)) {
+                    j++;
+                    for (uint i = 1; i < modbus_tcp_device_config.max_socket_in_eth; i++) {
+                        if (modbus_tcp_clients[j]->Connect(modbus_tcp_device_config.eth_osn_ip_osn, modbus_tcp_device_config.port)) { j++; }
+                    }
                 }
             }
         }
-        if (!modbus_tcp_device_config.eth_osn_ip_rez.empty()){
+        if (modbus_tcp_device_config.eth_osn_ip_rez.size() > 7){
             if (!modbus_tcp_clients[j]->CheckConnection()) {
                 if (modbus_tcp_clients[j]->Connect(modbus_tcp_device_config.eth_osn_ip_rez, modbus_tcp_device_config.port)) {
                     j++;
@@ -293,7 +295,7 @@ int main() {
                 }
             }
         }
-        if (!modbus_tcp_device_config.eth_osn_ip_rez.empty()){
+        if (modbus_tcp_device_config.eth_osn_ip_rez.size() > 7){
             if (!modbus_tcp_clients[j]->CheckConnection()) {
                 if (modbus_tcp_clients[j]->Connect(modbus_tcp_device_config.eth_rez_ip_osn, modbus_tcp_device_config.port)) {
                     j++;
@@ -303,7 +305,7 @@ int main() {
                 }
             }
         }
-        if (!modbus_tcp_device_config.eth_osn_ip_rez.empty()){
+        if (modbus_tcp_device_config.eth_osn_ip_rez.size() > 7){
             if (!modbus_tcp_clients[j]->CheckConnection()) {
                 if (modbus_tcp_clients[j]->Connect(modbus_tcp_device_config.eth_rez_ip_rez, modbus_tcp_device_config.port)) {
                     j++;
