@@ -14,10 +14,9 @@ public:
         client_ = UA_Client_new();
 
         UA_ClientConfig* config = UA_Client_getConfig(client_);
+        *config->logging = UA_Log_Stdout_withLevel(UA_LOGLEVEL_FATAL);
 
         UA_Client_run_iterate(client_, 100);
-
-        *config->logging = UA_Log_Stdout_withLevel(UA_LOGLEVEL_FATAL);
 
         Connect();
     }
@@ -27,10 +26,9 @@ public:
         client_ = UA_Client_new();
 
         UA_ClientConfig* config = UA_Client_getConfig(client_);
+        *config->logging = UA_Log_Stdout_withLevel(UA_LOGLEVEL_FATAL);
 
         UA_Client_run_iterate(client_, 100);
-
-        *config->logging = UA_Log_Stdout_withLevel(UA_LOGLEVEL_FATAL);
     }
 
     ~OpcUaClient() {
@@ -54,7 +52,7 @@ public:
     bool CheckConnection();
 
 private:
-    std::string ip_ = "opc.tcp://127.0.0.1:62544";
+    std::string ip_ = "127.0.0.1";
     int port_ = 62544;
     UA_Client* client_;
     bool is_connected_;

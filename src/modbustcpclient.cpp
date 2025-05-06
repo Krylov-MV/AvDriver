@@ -113,19 +113,19 @@ IndustrialProtocolUtils::Value ModbusTcpClient::GetValue(const IndustrialProtoco
     switch (type)
     {
     case IndustrialProtocolUtils::DataType::INT:
-        return (IndustrialProtocolUtils::Value) {data[0], 0, 0};
+        return (IndustrialProtocolUtils::Value) {.i = data[0], .u = 0, .f = 0};
     case IndustrialProtocolUtils::DataType::UINT:
     case IndustrialProtocolUtils::DataType::WORD:
-        return (IndustrialProtocolUtils::Value) {0, data[0], 0};
+        return (IndustrialProtocolUtils::Value) {.i = 0, .u = data[0], .f = 0};
     case IndustrialProtocolUtils::DataType::DINT:
-        return (IndustrialProtocolUtils::Value) {(data[0] << 16) + data[1], 0, 0};
+        return (IndustrialProtocolUtils::Value) {.i = (data[0] << 16) + data[1], .u = 0, .f = 0};
     case IndustrialProtocolUtils::DataType::UDINT:
     case IndustrialProtocolUtils::DataType::DWORD:
-        return (IndustrialProtocolUtils::Value) {0, (uint)(data[0] << 16) + data[1], 0};
+        return (IndustrialProtocolUtils::Value) {.i = 0, .u = (uint)(data[0] << 16) + data[1], .f = 0};
     case IndustrialProtocolUtils::DataType::REAL:
-        return (IndustrialProtocolUtils::Value) {0, 0, modbus_get_float_cdab(data)};
+        return (IndustrialProtocolUtils::Value) {.i = 0, .u = 0, .f = modbus_get_float_cdab(data)};
     default:
-        return (IndustrialProtocolUtils::Value) {0, 0, 0};
+        return (IndustrialProtocolUtils::Value) {.i = 0, .u = 0, .f = 0};
     }
 }
 

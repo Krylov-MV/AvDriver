@@ -9,7 +9,7 @@ void OpcUaClient::ReadDatas(const std::vector<IndustrialProtocolUtils::DataConfi
 
     for (int i = 0; i < data_count; i++) {
         UA_ReadValueId_init(&items[i]);
-        items[i].nodeId = UA_NODEID_STRING(1, strdup(data_configs[i].name.c_str()));
+        items[i].nodeId = UA_NODEID_STRING_ALLOC(1, data_configs[i].name.c_str());
         items[i].attributeId = UA_ATTRIBUTEID_VALUE;
     }
 
@@ -70,7 +70,7 @@ void OpcUaClient::WriteDatas(std::vector<IndustrialProtocolUtils::DataResult>& d
     for (int i = 0; i < data_count; i++) {
         UA_WriteValue_init(&items[i]);
 
-        items[i].nodeId = UA_NODEID_STRING(1, strdup(datas[i].name.c_str()));
+        items[i].nodeId = UA_NODEID_STRING_ALLOC(1, datas[i].name.c_str());
         items[i].attributeId = UA_ATTRIBUTEID_VALUE;
 
         if (datas[i].type == IndustrialProtocolUtils::DataType::INT) {
@@ -132,7 +132,7 @@ void OpcUaClient::WriteDatas(const std::vector<IndustrialProtocolUtils::DataConf
     for (int i = 0; i < data_count; i++) {
         UA_WriteValue_init(&items[i]);
 
-        items[i].nodeId = UA_NODEID_STRING(1, strdup(data_configs[i].name.c_str()));
+        items[i].nodeId = UA_NODEID_STRING_ALLOC(1, data_configs[i].name.c_str());
         items[i].attributeId = UA_ATTRIBUTEID_VALUE;
 
         if (datas[i].type == IndustrialProtocolUtils::DataType::INT) {
@@ -190,7 +190,9 @@ void OpcUaClient::WriteDatas(const std::vector<IndustrialProtocolUtils::DataConf
 }
 
 bool OpcUaClient::Connect() {
-    char* opc_url = strdup(ip_.c_str());
+    std::string url = "opc.tcp://" + ip_ + ":" + std::to_string(port_);
+
+    char* opc_url = strdup(url.c_str());
     UA_StatusCode status_code = UA_Client_connect(client_, opc_url);
     free(opc_url);
 
@@ -202,7 +204,9 @@ bool OpcUaClient::Connect(const std::string ip, int port) {
     ip_ = ip;
     port_ = port;
 
-    char* opc_url = strdup(ip_.c_str());
+    std::string url = "opc.tcp://" + ip_ + ":" + std::to_string(port_);
+
+    char* opc_url = strdup(url.c_str());
     UA_StatusCode status_code = UA_Client_connect(client_, opc_url);
     free(opc_url);
 

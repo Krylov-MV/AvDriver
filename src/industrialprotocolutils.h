@@ -50,10 +50,9 @@ public:
     };
 
     struct Value {
-        int i = 0;
-        uint u = 0;
-        float f = 0;
-        std::string s = "";
+        int i;
+        uint u;
+        float f;
     };
 
     struct DataResult {
@@ -65,6 +64,10 @@ public:
         UA_DateTime time_previos;
         UA_DateTime time_current;
     };
+
+    static std::vector<std::string> Split(const std::string &str, const char delimiter);
+
+    static bool IsIPAddress(const std::string& ip);
 
     static void ReadConfig (IndustrialProtocolUtils::ModbusTcpDeviceConfig &modbus_tcp_device_config, std::vector<IndustrialProtocolUtils::DataConfig> &modbus_tcp_to_opc_configs,
                             IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_device_config, std::vector<IndustrialProtocolUtils::DataConfig> &opc_to_modbus_tcp_configs);

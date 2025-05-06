@@ -1,5 +1,31 @@
 #include "industrialprotocolutils.h"
 
+std::vector<std::string> IndustrialProtocolUtils::Split(const std::string &str, const char delimiter) {
+    std::vector<std::string> tokens;
+    std::string token;
+
+    std::stringstream ss(str);
+    while (std::getline(ss, token, delimiter)) {
+        tokens.push_back(token);
+    }
+
+    return tokens;
+}
+
+bool IndustrialProtocolUtils::IsIPAddress(const std::string& ip) {
+    std::vector<std::string> tokens = Split(ip, '.');
+
+    if (tokens.size() != 4) return false;
+    for (const std::string& str : tokens) {
+        for (const char& c : str) {
+            if (!isdigit(c)) return false;
+        }
+        int value = stoi(str);
+        if (value < 0 || value > 255) return false;
+    }
+    return true;
+}
+
 void IndustrialProtocolUtils::ReadConfig (IndustrialProtocolUtils::ModbusTcpDeviceConfig &modbus_tcp_device_config,
                                           std::vector<IndustrialProtocolUtils::DataConfig> &modbus_tcp_to_opc_configs,
                                           IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_device_config,
@@ -7,12 +33,24 @@ void IndustrialProtocolUtils::ReadConfig (IndustrialProtocolUtils::ModbusTcpDevi
     std::string line;
 
     std::ifstream file("devices.txt");
-    while (getline(file, line))
-    {
-        std::istringstream(line) >> modbus_tcp_device_config.max_socket_in_eth >> modbus_tcp_device_config.port
+
+    getline(file, line);
+    std::istringstream(line) >> modbus_tcp_device_config.max_socket_in_eth >> modbus_tcp_device_config.port
                                  >> modbus_tcp_device_config.eth_osn_ip_osn >> modbus_tcp_device_config.eth_osn_ip_rez
                                  >> modbus_tcp_device_config.eth_rez_ip_osn >> modbus_tcp_device_config.eth_rez_ip_rez;
-    }
+
+    if (modbus_tcp_device_config.max_socket_in_eth < 0 || modbus_tcp_device_config.max_socket_in_eth > 16) modbus_tcp_device_config.max_socket_in_eth = 1;
+    if (modbus_tcp_device_config.port < 0 || modbus_tcp_device_config.port > 65535) modbus_tcp_device_config.port = 502;
+    if (!IsIPAddress(modbus_tcp_device_config.eth_osn_ip_osn)) { modbus_tcp_device_config.eth_osn_ip_osn.clear(); }
+    if (!IsIPAddress(modbus_tcp_device_config.eth_osn_ip_rez)) { modbus_tcp_device_config.eth_osn_ip_rez.clear(); }
+    if (!IsIPAddress(modbus_tcp_device_config.eth_rez_ip_osn)) { modbus_tcp_device_config.eth_rez_ip_osn.clear(); }
+    if (!IsIPAddress(modbus_tcp_device_config.eth_rez_ip_rez)) { modbus_tcp_device_config.eth_rez_ip_rez.clear(); }
+
+    getline(file, line);
+    std::istringstream(line) >> opc_ua_device_config.port >> opc_ua_device_config.eth_osn_ip_osn;
+    if (!IsIPAddress(opc_ua_device_config.eth_osn_ip_osn)) opc_ua_device_config.eth_osn_ip_osn = "127.0.0.1";
+    if (opc_ua_device_config.port < 0 || opc_ua_device_config.port > 65535) opc_ua_device_config.port = 62544;
+
     file.close();
 
     file.open("configs.txt");
