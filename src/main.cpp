@@ -18,7 +18,6 @@ void ModbusTcpToOpcUa(const IndustrialProtocolUtils::ModbusTcpDeviceConfig &modb
                       const std::vector<IndustrialProtocolUtils::DataConfig> &modbus_tcp_to_opc_configs,
                       std::vector<std::shared_ptr<ModbusTcpClient>> modbus_tcp_clients,
                       OpcUaClient &opc_ua_client) {
-
     //Собираем опрос в группы по 125 регистров
     //std::cout << "//Собираем опрос в группы по 125 регистров" << std::endl;
     std::vector<IndustrialProtocolUtils::DataConfig> configs;

@@ -5,6 +5,10 @@
 #include <open62541/client.h>
 #include <open62541/plugin/log_stdout.h>
 #include <vector>
+#include <map>
+#include <set>
+#include <memory>
+#include <string>
 
 #pragma once
 
@@ -38,6 +42,41 @@ public:
         UA_Client_delete(client_);
     }
 
+    struct Value {
+        union {
+            int int_;
+            unsigned int uint_;
+            float float_;
+        };
+        std::string string_;
+    };
+
+    struct WriteConfig {
+        bool allowed;
+        std::string node_id;
+        std::string type;
+        Value value;
+    };
+
+    struct ReadConfig {
+        std::string node_id;
+        std::string type;
+    };
+
+    struct OpcUaValue {
+        Value value;
+        long source_timestamp;
+        uint32_t quality;
+    };
+
+    OpcUaValue Read(const ReadConfig& config);
+
+    void Read(const ReadConfig& config, OpcUaValue& result);
+
+    void Read(const std::vector<ReadConfig>& configs, std::map<std::string, OpcUaValue>& results);
+
+    void Write(std::vector<WriteConfig>& configs);
+
     void ReadDatas(const std::vector<IndustrialProtocolUtils::DataConfig>& data_configs, std::vector<IndustrialProtocolUtils::DataResult>& data_results);
 
     void WriteDatas(std::vector<IndustrialProtocolUtils::DataResult>& datas);
@@ -58,6 +97,7 @@ private:
     UA_Client* client_;
     bool is_connected_;
     bool should_run_;
+    const std::set<std::string> types_ = { "INT", "UINT", "WORD", "DINT", "UDINT", "DWORD", "REAL" };
 
     void Stop();
 };
