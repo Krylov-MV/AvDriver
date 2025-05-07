@@ -2,11 +2,11 @@
 	<AvDriver>
     	<devices>
         	<device>
-            	<name>КЦ</name>
+            	<name>plc</name>
             	<type>ModbusTcpClient</type>
             	<settings>
                 	<connections>
-                    	<connection>192.168.111.132</connection>
+                    	<connection>192.168.111.132:502</connection>
                     	<connection>192.168.0.2</connection>
                     	<connection>192.168.0.3</connection>
                 	</connections>
@@ -14,10 +14,11 @@
                     <port>502</port>
                 	<timeout>1000</timeout>
                 	<retries>3</retries>
+                    <mapping_full_allow>true</mapping_full_allow>
             	</settings>
         	</device>
             <device>
-            	<name>АРМ</name>
+            	<name>opcua</name>
             	<type>OpcUaClient</type>
             	<settings>
                 	<connections>
@@ -27,5 +28,11 @@
             	</settings>
         	</device>
         </devices>
+        <configs>
+            <config>
+                <name>configs.txt</name>
+                <version>0.1</version>
+            </config>
+        </configs>
     </AvDriver>
 </root>

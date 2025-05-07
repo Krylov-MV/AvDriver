@@ -103,11 +103,15 @@ void IndustrialProtocolUtils::ReadConfig (IndustrialProtocolUtils::ModbusTcpDevi
         std::vector<std::string> device_connections;
         int device_max_socket = 1;
         int device_port = 502;
+        bool device_mapping_full_allow = true;
         if (device->FirstChildElement("settings")->FirstChildElement("max_socket")) {
             device_max_socket = device->FirstChildElement("settings")->FirstChildElement("max_socket")->IntText();
         }
         if (device->FirstChildElement("settings")->FirstChildElement("port")) {
             device_port = device->FirstChildElement("settings")->FirstChildElement("port")->IntText();
+        }
+        if (device->FirstChildElement("settings")->FirstChildElement("mapping_full_allow")) {
+            device_mapping_full_allow = device->FirstChildElement("settings")->FirstChildElement("port")->BoolText();
         }
 
         // Получаем настройки
@@ -123,13 +127,15 @@ void IndustrialProtocolUtils::ReadConfig (IndustrialProtocolUtils::ModbusTcpDevi
             }
         }
 
+
+
         if (device_type == "ModbusTcpClient") {
-            std::cout << "modbus" << std::endl;
             if (device_max_socket < 0 || device_max_socket > 16) device_max_socket = 1;
             if (device_port < 0 || device_port > 65535) device_port = 502;
 
             modbus_tcp_device_config.max_socket_in_eth = device_max_socket;
             modbus_tcp_device_config.port = device_port;
+            modbus_tcp_device_config.mapping_full_allow = device_mapping_full_allow;
 
             if (device_connections.size() > 0) {
                 if (IsIPAddress(device_connections[0])) { modbus_tcp_device_config.eth_osn_ip_osn = device_connections[0]; }
@@ -156,65 +162,75 @@ void IndustrialProtocolUtils::ReadConfig (IndustrialProtocolUtils::ModbusTcpDevi
         }
     }
 
-    std::string line;
-    std::ifstream file("configs.txt");
-    while (getline(file, line))
-    {
-        std::string from_device;
-        std::string from_function;
-        std::string from_address;
-        std::string from_type;
-        std::string from_lenght;
+    tinyxml2::XMLElement* configs = programm->FirstChildElement("configs");
 
-        std::string to_device;
-        std::string to_function;
-        std::string to_address;
-        std::string to_type;
-        std::string to_lenght;
-
-        std::istringstream(line) >> (from_device) >> (from_function) >> (from_address) >> (from_type) >> (from_lenght)
-                                 >> (to_device)   >> (to_function)   >> (to_address)   >> (to_type)   >> (to_lenght);
-
-        IndustrialProtocolUtils::DataType type;
-
-        if (from_type == "INT") {
-            type = IndustrialProtocolUtils::DataType::INT;
-        }
-        if (from_type == "UINT") {
-            type = IndustrialProtocolUtils::DataType::UINT;
-        }
-        if (from_type == "DINT") {
-            type = IndustrialProtocolUtils::DataType::DINT;
-        }
-        if (from_type == "UDINT") {
-            type = IndustrialProtocolUtils::DataType::UDINT;
-        }
-        if (from_type == "WORD") {
-            type = IndustrialProtocolUtils::DataType::WORD;
-        }
-        if (from_type == "DWORD") {
-            type = IndustrialProtocolUtils::DataType::DWORD;
-        }
-        if (from_type == "REAL") {
-            type = IndustrialProtocolUtils::DataType::REAL;
-        }
-
-        if(from_function == "3") { modbus_tcp_to_opc_configs.push_back({(uint)std::stoi(from_address), type, to_address}); }
-
-        if(from_function == "16") { opc_to_modbus_tcp_configs.push_back({(uint)std::stoi(from_address), type, to_address}); }
-
-        if(from_function == "23") {
-            modbus_tcp_to_opc_configs.push_back({(uint)std::stoi(from_address), type, to_address});
-            opc_to_modbus_tcp_configs.push_back({(uint)std::stoi(from_address), type, to_address + ".write"});
-        }
+    std::string config_name;
+    std::string config_version;
+    for (tinyxml2::XMLElement* config = configs->FirstChildElement("config"); config != nullptr; config = config->NextSiblingElement("config")) {
+        config_name = config->FirstChildElement("name")->GetText();
+        config_version = config->FirstChildElement("version")->GetText();
     }
-    file.close();
 
-    std::sort(modbus_tcp_to_opc_configs.begin(), modbus_tcp_to_opc_configs.end(),
-        [](const IndustrialProtocolUtils::DataConfig &a, const IndustrialProtocolUtils::DataConfig &b) { return a.address < b.address; });
-    std::sort(opc_to_modbus_tcp_configs.begin(), opc_to_modbus_tcp_configs.end(),
-        [](const IndustrialProtocolUtils::DataConfig &a, const IndustrialProtocolUtils::DataConfig &b) { return a.address < b.address; });
+    if (config_version == "0.1") {
+        std::string line;
+        std::ifstream file(config_name);
+        while (getline(file, line))
+        {
+            std::string from_device;
+            std::string from_function;
+            std::string from_address;
+            std::string from_type;
+            std::string from_lenght;
 
+            std::string to_device;
+            std::string to_function;
+            std::string to_address;
+            std::string to_type;
+            std::string to_lenght;
+
+            std::istringstream(line) >> (from_device) >> (from_function) >> (from_address) >> (from_type) >> (from_lenght)
+                                     >> (to_device)   >> (to_function)   >> (to_address)   >> (to_type)   >> (to_lenght);
+
+            IndustrialProtocolUtils::DataType type;
+
+            if (from_type == "INT") {
+                type = IndustrialProtocolUtils::DataType::INT;
+            }
+            if (from_type == "UINT") {
+                type = IndustrialProtocolUtils::DataType::UINT;
+            }
+            if (from_type == "DINT") {
+                type = IndustrialProtocolUtils::DataType::DINT;
+            }
+            if (from_type == "UDINT") {
+                type = IndustrialProtocolUtils::DataType::UDINT;
+            }
+            if (from_type == "WORD") {
+                type = IndustrialProtocolUtils::DataType::WORD;
+            }
+            if (from_type == "DWORD") {
+                type = IndustrialProtocolUtils::DataType::DWORD;
+            }
+            if (from_type == "REAL") {
+                type = IndustrialProtocolUtils::DataType::REAL;
+            }
+
+            if(from_function == "3") { modbus_tcp_to_opc_configs.push_back({(uint)std::stoi(from_address), type, to_address}); }
+
+            if(from_function == "16") { opc_to_modbus_tcp_configs.push_back({(uint)std::stoi(from_address), type, to_address}); }
+
+            if(from_function == "23") {
+                modbus_tcp_to_opc_configs.push_back({(uint)std::stoi(from_address), type, to_address});
+                opc_to_modbus_tcp_configs.push_back({(uint)std::stoi(from_address), type, to_address + ".write"});
+            }
+        }
+        file.close();
+
+        std::sort(modbus_tcp_to_opc_configs.begin(), modbus_tcp_to_opc_configs.end(),
+            [](const IndustrialProtocolUtils::DataConfig &a, const IndustrialProtocolUtils::DataConfig &b) { return a.address < b.address; });
+        std::sort(opc_to_modbus_tcp_configs.begin(), opc_to_modbus_tcp_configs.end(),
+            [](const IndustrialProtocolUtils::DataConfig &a, const IndustrialProtocolUtils::DataConfig &b) { return a.address < b.address; });
+    }
     //for (auto config : opc_to_modbus_tcp_configs) {
     //    std::cout << config.address << " " << config.name << std::endl;
     //}
