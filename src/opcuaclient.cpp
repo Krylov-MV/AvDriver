@@ -74,32 +74,32 @@ void OpcUaClient::Read(const ReadConfig& config, OpcUaValue& result) {
     response = UA_Client_Service_read(client_, request);
 
     if (response.responseHeader.serviceResult == UA_STATUSCODE_GOOD) {
-            if (response.results[0].hasValue && (response.results[0].status >= UA_STATUSCODE_GOOD && response.results[0].status <= UA_STATUSCODE_UNCERTAIN)) {
-                long source_timestamp = response.results[0].sourceTimestamp;
-                uint32_t quality = response.results[0].status;
-                std::string node_id = config.node_id;
-                Value value;
-                if (config.type == "INT") {
-                    value.int_ = *(int*)response.results[0].value.data;
-                }
-                if (config.type == "DINT") {
-                    value.int_ = *(int*)response.results[0].value.data;
-                }
-                if (config.type == "UINT" || config.type == "WORD") {
-                    value.uint_ = *(unsigned int*)response.results[0].value.data;
-                }
-                if (config.type == "UDINT" || config.type == "DWORD") {
-                    value.uint_ = *(unsigned int*)response.results[0].value.data;
-                }
-                if (config.type == "REAL") {
-                    value.float_ = *(float*)response.results[0].value.data;
-                }
-                if (config.type == "STRING") {
-                    value.string_ = *(std::string*)response.results[0].value.data;
-                }
-
-                result = {.value = value, .source_timestamp = source_timestamp, .quality = quality};
+        if (response.results[0].hasValue && (response.results[0].status >= UA_STATUSCODE_GOOD && response.results[0].status <= UA_STATUSCODE_UNCERTAIN)) {
+            long source_timestamp = response.results[0].sourceTimestamp;
+            uint32_t quality = response.results[0].status;
+            std::string node_id = config.node_id;
+            Value value;
+            if (config.type == "INT") {
+                value.int_ = *(int*)response.results[0].value.data;
             }
+            if (config.type == "DINT") {
+                value.int_ = *(int*)response.results[0].value.data;
+            }
+            if (config.type == "UINT" || config.type == "WORD") {
+                value.uint_ = *(unsigned int*)response.results[0].value.data;
+            }
+            if (config.type == "UDINT" || config.type == "DWORD") {
+                value.uint_ = *(unsigned int*)response.results[0].value.data;
+            }
+            if (config.type == "REAL") {
+                value.float_ = *(float*)response.results[0].value.data;
+            }
+            if (config.type == "STRING") {
+                value.string_ = *(std::string*)response.results[0].value.data;
+            }
+
+            result = {.value = value, .source_timestamp = source_timestamp, .quality = quality};
+        }
     } else {
         Disconnect();
     }
@@ -163,6 +163,66 @@ void OpcUaClient::Read(const std::vector<ReadConfig>& configs, std::map<std::str
 
     for (int i = 0; i < data_count; i++) { UA_ReadValueId_clear(&items[i]); }
     UA_ReadResponse_clear(&response);
+}
+
+void OpcUaClient::Write(WriteConfig& config) {
+    UA_WriteRequest request;
+    UA_WriteRequest_init(&request);
+    UA_WriteValue item;
+
+    if (auto iterator = types_.find(config.type) != types_.end() && config.allowed) {
+        config.allowed = false;
+
+        UA_WriteValue_init(&item);
+
+        item.nodeId = UA_NODEID_STRING_ALLOC(1, config.node_id.c_str());
+        item.attributeId = UA_ATTRIBUTEID_VALUE;
+
+        if (config.type == "INT") {
+            item.value.value.type = &UA_TYPES[UA_TYPES_INT16];
+            item.value.value.storageType = UA_VARIANT_DATA_NODELETE;
+            item.value.value.data = &config.value.int_;
+        }
+        if (config.type == "DINT") {
+            item.value.value.type = &UA_TYPES[UA_TYPES_INT32];
+            item.value.value.storageType = UA_VARIANT_DATA_NODELETE;
+            item.value.value.data = &config.value.int_;
+        }
+         if (config.type == "UINT" || config.type == "WORD") {
+            item.value.value.type = &UA_TYPES[UA_TYPES_UINT16];
+            item.value.value.storageType = UA_VARIANT_DATA_NODELETE;
+            item.value.value.data = &config.value.uint_;
+        }
+        if (config.type == "UDINT" || config.type == "DWORD") {
+            item.value.value.type = &UA_TYPES[UA_TYPES_UINT32];
+            item.value.value.storageType = UA_VARIANT_DATA_NODELETE;
+            item.value.value.data = &config.value.uint_;
+        }
+        if (config.type == "REAL") {
+            item.value.value.type = &UA_TYPES[UA_TYPES_FLOAT];
+            item.value.value.storageType = UA_VARIANT_DATA_NODELETE;
+            item.value.value.data = &config.value.float_;
+        }
+        if (config.type == "STRING") {
+            item.value.value.type = &UA_TYPES[UA_TYPES_STRING];
+            item.value.value.storageType = UA_VARIANT_DATA_NODELETE;
+            item.value.value.data = &config.value.string_;
+        }
+        item.value.hasValue = true;
+    }
+
+    request.nodesToWrite = &item;
+    request.nodesToWriteSize = 1;
+
+    UA_WriteResponse response = UA_Client_Service_write(client_, request);
+
+    if (response.responseHeader.serviceResult != UA_STATUSCODE_GOOD) {
+        Disconnect();
+    }
+
+    UA_WriteResponse_clear(&response);
+
+    UA_WriteValue_clear(&item);
 }
 
 void OpcUaClient::Write(std::vector<WriteConfig>& configs) {

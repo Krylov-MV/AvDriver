@@ -75,6 +75,8 @@ public:
 
     void Read(const std::vector<ReadConfig>& configs, std::map<std::string, OpcUaValue>& results);
 
+    void Write(WriteConfig& config);
+
     void Write(std::vector<WriteConfig>& configs);
 
     void ReadDatas(const std::vector<IndustrialProtocolUtils::DataConfig>& data_configs, std::vector<IndustrialProtocolUtils::DataResult>& data_results);
