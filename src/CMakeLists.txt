@@ -6,7 +6,8 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Threads REQUIRED)
-find_package(open62541 REQUIRED)
+
+find_library(libmodbus NAMES modbus)
 
 add_executable(AvDriver
     main.cpp
@@ -15,9 +16,11 @@ add_executable(AvDriver
     industrialprotocolutils.cpp
     industrialprotocolutils.h
     opcuaclient.cpp
-    opcuaclient.h)
+    opcuaclient.h
+    tinyxml2.cpp
+    tinyxml2.h)
 
-target_link_libraries(AvDriver modbus open62541)
+target_link_libraries(AvDriver ${libmodbus} open62541)
 
 target_link_libraries(AvDriver
     ${CMAKE_THREAD_LIBS_INIT}

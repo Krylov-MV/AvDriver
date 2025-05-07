@@ -26,34 +26,138 @@ bool IndustrialProtocolUtils::IsIPAddress(const std::string& ip) {
     return true;
 }
 
+#include "tinyxml2.h"
+
+int IndustrialProtocolUtils::ReadConfigXml () {
+    tinyxml2::XMLDocument doc;
+    // Загружаем XML файл
+    if (doc.LoadFile("AvDriver.xml") != tinyxml2::XML_SUCCESS) {
+        std::cerr << "Ошибка при загрузке файла: " << doc.ErrorIDToName(doc.ErrorID()) << std::endl;
+        //return -1;
+    }
+
+    // Получаем корневой элемент
+    std::string str = "AvDriver";
+    tinyxml2::XMLElement* root = doc.RootElement();
+    if (root == nullptr) {
+        std::cerr << "Ошибка: корневой элемент отсутствует." << std::endl;
+        //return -1;
+    }
+
+    tinyxml2::XMLElement* programm = root->FirstChildElement("AvDriver");
+    tinyxml2::XMLElement* devices = programm->FirstChildElement("devices");
+
+    // Перебираем все элементы device
+    for (tinyxml2::XMLElement* device = devices->FirstChildElement("device"); device != nullptr; device = device->NextSiblingElement("device")) {
+        std::string device_name = device->FirstChildElement("name")->GetText();
+        std::string device_type = device->FirstChildElement("type")->GetText();
+        std::vector<std::string> device_connections;
+        int device_max_socket = device->FirstChildElement("settings")->FirstChildElement("max_socket")->IntText();
+        //device->FirstChildElement("settings")->FirstChildElement("max_socket")->QueryIntText(&device_max_socket);
+
+        // Получаем настройки
+        tinyxml2::XMLElement* settings = device->FirstChildElement("settings");
+        if (settings) {
+            tinyxml2::XMLElement* connections = settings->FirstChildElement("connections");
+            if (connections) {
+                for (tinyxml2::XMLElement* connection = connections->FirstChildElement("connection"); connection != nullptr; connection = connection->NextSiblingElement("connection")) {
+                    if (connection) {
+                        device_connections.push_back(connection->GetText());
+                    }
+                }
+            }
+        }
+
+        if (device_type == "ModbusTcpClient") {
+        }
+    }
+}
+
 void IndustrialProtocolUtils::ReadConfig (IndustrialProtocolUtils::ModbusTcpDeviceConfig &modbus_tcp_device_config,
                                           std::vector<IndustrialProtocolUtils::DataConfig> &modbus_tcp_to_opc_configs,
                                           IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_device_config,
                                           std::vector<IndustrialProtocolUtils::DataConfig> &opc_to_modbus_tcp_configs) {
+
+    tinyxml2::XMLDocument doc;
+    // Загружаем XML файл
+    if (doc.LoadFile("AvDriver.xml") != tinyxml2::XML_SUCCESS) {
+        std::cerr << "Ошибка при загрузке файла: " << doc.ErrorIDToName(doc.ErrorID()) << std::endl;
+        //return -1;
+    }
+
+    // Получаем корневой элемент
+    std::string str = "AvDriver";
+    tinyxml2::XMLElement* root = doc.RootElement();
+    if (root == nullptr) {
+        std::cerr << "Ошибка: корневой элемент отсутствует." << std::endl;
+        //return -1;
+    }
+
+    tinyxml2::XMLElement* programm = root->FirstChildElement("AvDriver");
+    tinyxml2::XMLElement* devices = programm->FirstChildElement("devices");
+
+    // Перебираем все элементы device
+    for (tinyxml2::XMLElement* device = devices->FirstChildElement("device"); device != nullptr; device = device->NextSiblingElement("device")) {
+        std::string device_name = device->FirstChildElement("name")->GetText();
+        std::string device_type = device->FirstChildElement("type")->GetText();
+        std::vector<std::string> device_connections;
+        int device_max_socket = 1;
+        int device_port = 502;
+        if (device->FirstChildElement("settings")->FirstChildElement("max_socket")) {
+            device_max_socket = device->FirstChildElement("settings")->FirstChildElement("max_socket")->IntText();
+        }
+        if (device->FirstChildElement("settings")->FirstChildElement("port")) {
+            device_port = device->FirstChildElement("settings")->FirstChildElement("port")->IntText();
+        }
+
+        // Получаем настройки
+        tinyxml2::XMLElement* settings = device->FirstChildElement("settings");
+        if (settings) {
+            tinyxml2::XMLElement* connections = settings->FirstChildElement("connections");
+            if (connections) {
+                for (tinyxml2::XMLElement* connection = connections->FirstChildElement("connection"); connection != nullptr; connection = connection->NextSiblingElement("connection")) {
+                    if (connection) {
+                        device_connections.push_back(connection->GetText());
+                    }
+                }
+            }
+        }
+
+        if (device_type == "ModbusTcpClient") {
+            std::cout << "modbus" << std::endl;
+            if (device_max_socket < 0 || device_max_socket > 16) device_max_socket = 1;
+            if (device_port < 0 || device_port > 65535) device_port = 502;
+
+            modbus_tcp_device_config.max_socket_in_eth = device_max_socket;
+            modbus_tcp_device_config.port = device_port;
+
+            if (device_connections.size() > 0) {
+                if (IsIPAddress(device_connections[0])) { modbus_tcp_device_config.eth_osn_ip_osn = device_connections[0]; }
+            }
+            if (device_connections.size() > 1) {
+                if (IsIPAddress(device_connections[1])) { modbus_tcp_device_config.eth_osn_ip_rez = device_connections[1]; }
+            }
+            if (device_connections.size() > 2) {
+                if (IsIPAddress(device_connections[2])) { modbus_tcp_device_config.eth_rez_ip_osn = device_connections[2]; }
+            }
+            if (device_connections.size() > 3) {
+                if (IsIPAddress(device_connections[3])) { modbus_tcp_device_config.eth_rez_ip_rez = device_connections[3]; }
+            }
+        }
+
+        if (device_type == "OpcUaClient") {
+            if (device_port < 0 || device_port > 65535) device_port = 502;
+
+            opc_ua_device_config.port = device_port;
+
+            if (device_connections.size() > 0) {
+                if (IsIPAddress(device_connections[0])) { opc_ua_device_config.eth_osn_ip_osn = device_connections[0]; }
+            }
+        }
+    }
+
     std::string line;
-
-    std::ifstream file("devices.txt");
-
-    getline(file, line);
-    std::istringstream(line) >> modbus_tcp_device_config.max_socket_in_eth >> modbus_tcp_device_config.port
-                                 >> modbus_tcp_device_config.eth_osn_ip_osn >> modbus_tcp_device_config.eth_osn_ip_rez
-                                 >> modbus_tcp_device_config.eth_rez_ip_osn >> modbus_tcp_device_config.eth_rez_ip_rez;
-
-    if (modbus_tcp_device_config.max_socket_in_eth < 0 || modbus_tcp_device_config.max_socket_in_eth > 16) modbus_tcp_device_config.max_socket_in_eth = 1;
-    if (modbus_tcp_device_config.port < 0 || modbus_tcp_device_config.port > 65535) modbus_tcp_device_config.port = 502;
-    if (!IsIPAddress(modbus_tcp_device_config.eth_osn_ip_osn)) { modbus_tcp_device_config.eth_osn_ip_osn.clear(); }
-    if (!IsIPAddress(modbus_tcp_device_config.eth_osn_ip_rez)) { modbus_tcp_device_config.eth_osn_ip_rez.clear(); }
-    if (!IsIPAddress(modbus_tcp_device_config.eth_rez_ip_osn)) { modbus_tcp_device_config.eth_rez_ip_osn.clear(); }
-    if (!IsIPAddress(modbus_tcp_device_config.eth_rez_ip_rez)) { modbus_tcp_device_config.eth_rez_ip_rez.clear(); }
-
-    getline(file, line);
-    std::istringstream(line) >> opc_ua_device_config.port >> opc_ua_device_config.eth_osn_ip_osn;
-    if (!IsIPAddress(opc_ua_device_config.eth_osn_ip_osn)) opc_ua_device_config.eth_osn_ip_osn = "127.0.0.1";
-    if (opc_ua_device_config.port < 0 || opc_ua_device_config.port > 65535) opc_ua_device_config.port = 62544;
-
-    file.close();
-
-    file.open("configs.txt");
+    std::ifstream file("configs.txt");
     while (getline(file, line))
     {
         std::string from_device;

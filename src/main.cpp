@@ -243,6 +243,8 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
 }
 
 int main() {
+    //IndustrialProtocolUtils::ReadConfigXml();
+
     IndustrialProtocolUtils::ModbusTcpDeviceConfig modbus_tcp_device_config;
     std::vector<IndustrialProtocolUtils::DataConfig> modbus_tcp_to_opc_configs;
     std::vector<std::shared_ptr<ModbusTcpClient>> modbus_tcp_clients;
@@ -252,8 +254,9 @@ int main() {
 
     IndustrialProtocolUtils::ReadConfig(modbus_tcp_device_config, modbus_tcp_to_opc_configs, opc_ua_device_config, opc_to_modbus_tcp_configs);
     for (uint i = 0; i < modbus_tcp_device_config.max_socket_in_eth * 4; i++) {
-        modbus_tcp_clients.push_back(std::make_shared<ModbusTcpClient>(modbus_tcp_device_config.eth_osn_ip_osn, modbus_tcp_device_config.port));
+        modbus_tcp_clients.push_back(std::make_shared<ModbusTcpClient>());
     }
+
     OpcUaClient opc_ua_client(opc_ua_device_config.eth_osn_ip_osn, opc_ua_device_config.port);
     std::vector<IndustrialProtocolUtils::DataResult> opc_to_modbus_results(opc_to_modbus_tcp_configs.size());
 

@@ -5,7 +5,7 @@
 #include <sstream>
 #include <fstream>
 #include <string>
-#include <open62541.h>
+#include <open62541/client.h>
 #include <vector>
 #include <algorithm>
 
@@ -71,6 +71,8 @@ public:
 
     static void ReadConfig (IndustrialProtocolUtils::ModbusTcpDeviceConfig &modbus_tcp_device_config, std::vector<IndustrialProtocolUtils::DataConfig> &modbus_tcp_to_opc_configs,
                             IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_device_config, std::vector<IndustrialProtocolUtils::DataConfig> &opc_to_modbus_tcp_configs);
+
+    static int ReadConfigXml ();
 };
 
 #endif // INDUSTRIALPROTOCOLUTILS_H
