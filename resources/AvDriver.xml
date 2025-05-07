@@ -1,0 +1,31 @@
+<root>
+	<AvDriver>
+    	<devices>
+        	<device>
+            	<name>КЦ</name>
+            	<type>ModbusTcpClient</type>
+            	<settings>
+                	<connections>
+                    	<connection>192.168.111.132</connection>
+                    	<connection>192.168.0.2</connection>
+                    	<connection>192.168.0.3</connection>
+                	</connections>
+                    <max_socket>3</max_socket>
+                    <port>502</port>
+                	<timeout>1000</timeout>
+                	<retries>3</retries>
+            	</settings>
+        	</device>
+            <device>
+            	<name>АРМ</name>
+            	<type>OpcUaClient</type>
+            	<settings>
+                	<connections>
+                    	<connection>192.168.111.132</connection>
+                	</connections>
+                    <port>62544</port>
+            	</settings>
+        	</device>
+        </devices>
+    </AvDriver>
+</root>
