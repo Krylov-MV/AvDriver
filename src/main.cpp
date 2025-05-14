@@ -14,6 +14,8 @@ void ThreadModbusTcpClientWrite(std::shared_ptr<ModbusTcpClient> modbus_tcp_clie
     modbus_tcp_client->WriteHoldingRegisters(config_datas, data);
 }
 
+std::vector<IndustrialProtocolUtils::DataResult> datas_old;
+
 void ModbusTcpToOpcUa(const IndustrialProtocolUtils::ModbusTcpDeviceConfig &modbus_tcp_device_config,
                       const std::vector<IndustrialProtocolUtils::DataConfig> &modbus_tcp_to_opc_configs,
                       std::vector<std::shared_ptr<ModbusTcpClient>> modbus_tcp_clients,
@@ -86,13 +88,24 @@ void ModbusTcpToOpcUa(const IndustrialProtocolUtils::ModbusTcpDeviceConfig &modb
     //Подготовка и запись данных для записи в OPC сервер
     //std::cout << "//Подготовка и запись данных для записи в OPC сервер" << std::endl;
     std::vector<IndustrialProtocolUtils::DataResult> datas;
+    bool force_write = false;
     for (unsigned long i = 0; i < max_socket_in_eth; i++) {
         for (unsigned long j = 0; j < data_results[i].size(); j++) {
             datas.push_back(data_results[i][j]);
         }
+        if (datas_old.empty()) { datas_old = datas; force_write = true; }
     }
 
-    opc_ua_client.WriteDatas(datas);
+    std::vector<IndustrialProtocolUtils::DataResult> datas_new;
+
+    for (unsigned long i = 0; i < datas_old.size(); i++) {
+        if (datas_old[i].value.f != datas[i].value.f || datas_old[i].value.i != datas[i].value.i || datas_old[i].value.u != datas[i].value.u || force_write) {
+            datas_old[i].value = datas[i].value;
+            datas_new.push_back(datas[i]);
+        }
+    }
+
+    opc_ua_client.WriteDatas(datas_new);
 }
 
 void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_device_config,
@@ -263,6 +276,7 @@ int main() {
         //Если нет связи с OPC сервером, то нет смысла обрабатывать логику
         if (!opc_ua_client.CheckConnection()) {
             std::cout << "Нет связи с OPC сервером" << std::endl;
+            if (!datas_old.empty()) datas_old.clear();
             std::this_thread::sleep_for(std::chrono::milliseconds(5000));
             continue;
         }
@@ -289,7 +303,7 @@ int main() {
                 }
             }
         }
-        if (modbus_tcp_device_config.eth_osn_ip_rez.length()) {
+        if (modbus_tcp_device_config.eth_rez_ip_osn.length()) {
             if (!modbus_tcp_clients[j]->CheckConnection()) {
                 if (modbus_tcp_clients[j]->Connect(modbus_tcp_device_config.eth_rez_ip_osn, modbus_tcp_device_config.port)) {
                     j++;
@@ -299,7 +313,7 @@ int main() {
                 }
             }
         }
-        if (modbus_tcp_device_config.eth_osn_ip_rez.length()) {
+        if (modbus_tcp_device_config.eth_rez_ip_rez.length()) {
             if (!modbus_tcp_clients[j]->CheckConnection()) {
                 if (modbus_tcp_clients[j]->Connect(modbus_tcp_device_config.eth_rez_ip_rez, modbus_tcp_device_config.port)) {
                     j++;
@@ -319,6 +333,7 @@ int main() {
 
         if (link_is_fail) {
             std::cout << "Нет связи с Modbus устройством" << std::endl;
+            if (!datas_old.empty()) datas_old.clear();
             std::this_thread::sleep_for(std::chrono::milliseconds(5000));
             continue;
         }

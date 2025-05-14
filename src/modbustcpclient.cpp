@@ -10,25 +10,27 @@ void ModbusTcpClient::ReadHoldingRegisters(const std::vector<std::vector<Industr
                 int start_address = config_data[0].address;
                 int length = config_data[config_data.size() - 1].address + GetLength(config_data[config_data.size() - 1].type) - config_data[0].address;
 
-                int rc = modbus_read_registers(ctx_, start_address, length, tab_reg);
+                if (is_connected_){
+                    int rc = modbus_read_registers(ctx_, start_address, length, tab_reg);
 
-                if (rc == length) {
-                    unsigned int j = 0;
-                    while (j < config_data.size()) {
-                        uint16_t data[2];
-                        IndustrialProtocolUtils::DataResult result;
-                        data[0] = tab_reg[config_data[j].address - start_address];
-                        if (GetLength(config_data[j].type) == 2) { data[1] = tab_reg[config_data[j].address - start_address + 1]; }
-                        result.name = config_data[j].name;
-                        result.type = config_data[j].type;
-                        result.quality = true;
-                        result.value = GetValue(result.type, data);
-                        result.address = config_data[j].address;
-                        data_result.push_back(result);
-                        j++;
+                    if (rc == length) {
+                        unsigned int j = 0;
+                        while (j < config_data.size()) {
+                            uint16_t data[2];
+                            IndustrialProtocolUtils::DataResult result;
+                            data[0] = tab_reg[config_data[j].address - start_address];
+                            if (GetLength(config_data[j].type) == 2) { data[1] = tab_reg[config_data[j].address - start_address + 1]; }
+                            result.name = config_data[j].name;
+                            result.type = config_data[j].type;
+                            result.quality = true;
+                            result.value = GetValue(result.type, data);
+                            result.address = config_data[j].address;
+                            data_result.push_back(result);
+                            j++;
+                        }
+                    } else {
+                        Disconnect();
                     }
-                } else {
-                    Disconnect();
                 }
             }
         }
@@ -48,9 +50,11 @@ void ModbusTcpClient::WriteHoldingRegisters(const std::vector<std::vector<Indust
                     tab_reg[j] = data[i][j];
                 }
 
-                int rc = modbus_write_registers(ctx_, start_address, lenght, tab_reg);
-                if (rc < 0) {
-                    Disconnect();
+                if (is_connected_) {
+                    int rc = modbus_write_registers(ctx_, start_address, lenght, tab_reg);
+                    if (rc < 0) {
+                        Disconnect();
+                    }
                 }
             }
         }
@@ -118,10 +122,10 @@ IndustrialProtocolUtils::Value ModbusTcpClient::GetValue(const IndustrialProtoco
     case IndustrialProtocolUtils::DataType::WORD:
         return (IndustrialProtocolUtils::Value) {.i = 0, .u = data[0], .f = 0};
     case IndustrialProtocolUtils::DataType::DINT:
-        return (IndustrialProtocolUtils::Value) {.i = (data[0] << 16) + data[1], .u = 0, .f = 0};
+        return (IndustrialProtocolUtils::Value) {.i = (data[1] << 16) + data[0], .u = 0, .f = 0};
     case IndustrialProtocolUtils::DataType::UDINT:
     case IndustrialProtocolUtils::DataType::DWORD:
-        return (IndustrialProtocolUtils::Value) {.i = 0, .u = (uint)(data[0] << 16) + data[1], .f = 0};
+        return (IndustrialProtocolUtils::Value) {.i = 0, .u = (uint)(data[1] << 16) + data[0], .f = 0};
     case IndustrialProtocolUtils::DataType::REAL:
         return (IndustrialProtocolUtils::Value) {.i = 0, .u = 0, .f = modbus_get_float_cdab(data)};
     default:
