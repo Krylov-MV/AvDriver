@@ -44,11 +44,14 @@ public:
 
     struct Value {
         union {
-            int int_;
-            unsigned int uint_;
-            float float_;
+            int i;
+            unsigned int u;
+            float f;
         };
-        std::string string_;
+        std::string s;
+        std::string type;
+        long source_timestamp;
+        uint32_t quality;
     };
 
     struct WriteConfig {
@@ -63,17 +66,11 @@ public:
         std::string type;
     };
 
-    struct OpcUaValue {
-        Value value;
-        long source_timestamp;
-        uint32_t quality;
-    };
+    Value Read(const ReadConfig& config);
 
-    OpcUaValue Read(const ReadConfig& config);
+    void Read(const ReadConfig& config, Value& result);
 
-    void Read(const ReadConfig& config, OpcUaValue& result);
-
-    void Read(const std::vector<ReadConfig>& configs, std::map<std::string, OpcUaValue>& results);
+    void Read(const std::vector<ReadConfig>& configs, std::map<std::string, Value>& results);
 
     void Write(WriteConfig& config);
 
@@ -87,7 +84,7 @@ public:
 
     bool Connect();
 
-    bool Connect(const std::string ip, int port);
+    bool Connect(const std::string ip, const int port);
 
     void Disconnect();
 

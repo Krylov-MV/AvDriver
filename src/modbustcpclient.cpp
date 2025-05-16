@@ -74,7 +74,7 @@ void ModbusTcpClient::Connect() {
     }
 }
 
-bool ModbusTcpClient::Connect(std::string ip, int port) {
+bool ModbusTcpClient::Connect(const std::string ip, const int port) {
     ip_ = ip;
     port_ = port;
     ctx_ = modbus_new_tcp(ip_.c_str(), port_);
@@ -89,8 +89,8 @@ bool ModbusTcpClient::Connect(std::string ip, int port) {
 
 void ModbusTcpClient::Disconnect() {
     if (is_connected_) {
-        modbus_close(ctx_);
         is_connected_ = false;
+        modbus_close(ctx_);
     }
 }
 

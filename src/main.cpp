@@ -93,19 +93,21 @@ void ModbusTcpToOpcUa(const IndustrialProtocolUtils::ModbusTcpDeviceConfig &modb
         for (unsigned long j = 0; j < data_results[i].size(); j++) {
             datas.push_back(data_results[i][j]);
         }
-        if (datas_old.empty()) { datas_old = datas; force_write = true; }
+        if (datas_old.empty() && !datas.empty()) { datas_old = datas; force_write = true; }
     }
 
     std::vector<IndustrialProtocolUtils::DataResult> datas_new;
 
-    for (unsigned long i = 0; i < datas_old.size(); i++) {
-        if (datas_old[i].value.f != datas[i].value.f || datas_old[i].value.i != datas[i].value.i || datas_old[i].value.u != datas[i].value.u || force_write) {
-            datas_old[i].value = datas[i].value;
-            datas_new.push_back(datas[i]);
+    if (datas_old.size() == datas.size()) {
+        for (unsigned long i = 0; i < datas_old.size(); i++) {
+            if (datas_old[i].value.f != datas[i].value.f || datas_old[i].value.i != datas[i].value.i || datas_old[i].value.u != datas[i].value.u || force_write) {
+                datas_old[i].value = datas[i].value;
+                datas_new.push_back(datas[i]);
+            }
         }
     }
 
-    opc_ua_client.WriteDatas(datas_new);
+    if (!datas_new.empty()) { opc_ua_client.WriteDatas(datas_new); }
 }
 
 void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_device_config,

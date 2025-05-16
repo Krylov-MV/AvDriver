@@ -31,7 +31,7 @@ public:
 
     void Connect();
 
-    bool Connect(std::string ip, int port);
+    bool Connect(const std::string ip, const int port);
 
     void Disconnect();
 

@@ -1,7 +1,7 @@
 #include "opcuaclient.h"
 
-OpcUaClient::OpcUaValue OpcUaClient::Read(const ReadConfig& config) {
-    OpcUaValue result;
+OpcUaClient::Value OpcUaClient::Read(const ReadConfig& config) {
+    Value result;
 
     UA_ReadValueId item;
 
@@ -21,30 +21,28 @@ OpcUaClient::OpcUaValue OpcUaClient::Read(const ReadConfig& config) {
 
     if (response.responseHeader.serviceResult == UA_STATUSCODE_GOOD) {
             if (response.results[0].hasValue && (response.results[0].status >= UA_STATUSCODE_GOOD && response.results[0].status <= UA_STATUSCODE_UNCERTAIN)) {
-                long source_timestamp = response.results[0].sourceTimestamp;
-                uint32_t quality = response.results[0].status;
-                std::string node_id = config.node_id;
+                result.source_timestamp = response.results[0].sourceTimestamp;
+                result.quality = response.results[0].status;
+                result.type = config.type;
                 Value value;
                 if (config.type == "INT") {
-                    value.int_ = *(int*)response.results[0].value.data;
+                    result.i = *(int*)response.results[0].value.data;
                 }
                 if (config.type == "DINT") {
-                    value.int_ = *(int*)response.results[0].value.data;
+                    result.i = *(int*)response.results[0].value.data;
                 }
                 if (config.type == "UINT" || config.type == "WORD") {
-                    value.uint_ = *(unsigned int*)response.results[0].value.data;
+                    result.u = *(unsigned int*)response.results[0].value.data;
                 }
                 if (config.type == "UDINT" || config.type == "DWORD") {
-                    value.uint_ = *(unsigned int*)response.results[0].value.data;
+                    result.u = *(unsigned int*)response.results[0].value.data;
                 }
                 if (config.type == "REAL") {
-                    value.float_ = *(float*)response.results[0].value.data;
+                    result.f = *(float*)response.results[0].value.data;
                 }
                 if (config.type == "STRING") {
-                    value.string_ = *(std::string*)response.results[0].value.data;
+                    result.s = *(std::string*)response.results[0].value.data;
                 }
-
-                result = {.value = value, .source_timestamp = source_timestamp, .quality = quality};
             }
     } else {
         Disconnect();
@@ -56,7 +54,7 @@ OpcUaClient::OpcUaValue OpcUaClient::Read(const ReadConfig& config) {
     return result;
 }
 
-void OpcUaClient::Read(const ReadConfig& config, OpcUaValue& result) {
+void OpcUaClient::Read(const ReadConfig& config, Value& result) {
     UA_ReadValueId item;
 
     UA_ReadRequest request;
@@ -75,30 +73,31 @@ void OpcUaClient::Read(const ReadConfig& config, OpcUaValue& result) {
 
     if (response.responseHeader.serviceResult == UA_STATUSCODE_GOOD) {
         if (response.results[0].hasValue && (response.results[0].status >= UA_STATUSCODE_GOOD && response.results[0].status <= UA_STATUSCODE_UNCERTAIN)) {
-            long source_timestamp = response.results[0].sourceTimestamp;
-            uint32_t quality = response.results[0].status;
-            std::string node_id = config.node_id;
             Value value;
+            value.source_timestamp = response.results[0].sourceTimestamp;
+            value.quality = response.results[0].status;
+            value.type = config.type;
+            std::string node_id = config.node_id;
             if (config.type == "INT") {
-                value.int_ = *(int*)response.results[0].value.data;
+                value.i = *(int*)response.results[0].value.data;
             }
             if (config.type == "DINT") {
-                value.int_ = *(int*)response.results[0].value.data;
+                value.i = *(int*)response.results[0].value.data;
             }
             if (config.type == "UINT" || config.type == "WORD") {
-                value.uint_ = *(unsigned int*)response.results[0].value.data;
+                value.u = *(unsigned int*)response.results[0].value.data;
             }
             if (config.type == "UDINT" || config.type == "DWORD") {
-                value.uint_ = *(unsigned int*)response.results[0].value.data;
+                value.u = *(unsigned int*)response.results[0].value.data;
             }
             if (config.type == "REAL") {
-                value.float_ = *(float*)response.results[0].value.data;
+                value.f = *(float*)response.results[0].value.data;
             }
             if (config.type == "STRING") {
-                value.string_ = *(std::string*)response.results[0].value.data;
+                value.s = *(std::string*)response.results[0].value.data;
             }
 
-            result = {.value = value, .source_timestamp = source_timestamp, .quality = quality};
+            result = { value };
         }
     } else {
         Disconnect();
@@ -108,7 +107,7 @@ void OpcUaClient::Read(const ReadConfig& config, OpcUaValue& result) {
     UA_ReadResponse_clear(&response);
 }
 
-void OpcUaClient::Read(const std::vector<ReadConfig>& configs, std::map<std::string, OpcUaValue>& results) {
+void OpcUaClient::Read(const std::vector<ReadConfig>& configs, std::map<std::string, Value>& results) {
     int data_count = configs.size();
     UA_ReadValueId items[data_count];
 
@@ -131,30 +130,30 @@ void OpcUaClient::Read(const std::vector<ReadConfig>& configs, std::map<std::str
     if (response.responseHeader.serviceResult == UA_STATUSCODE_GOOD) {
         for (int i = 0; i < data_count; i++) {
             if (response.results[i].hasValue && (response.results[i].status >= UA_STATUSCODE_GOOD && response.results[i].status <= UA_STATUSCODE_UNCERTAIN)) {
-                long source_timestamp = response.results[i].sourceTimestamp;
-                uint32_t quality = response.results[i].status;
-                std::string node_id = configs[i].node_id;
                 Value value;
+                value.source_timestamp = response.results[i].sourceTimestamp;
+                value.quality = response.results[i].status;
+                value.type = configs[i].type;
+                std::string node_id = configs[i].node_id;
                 if (configs[i].type == "INT") {
-                    value.int_ = *(int*)response.results[i].value.data;
+                    value.i = *(int*)response.results[i].value.data;
                 }
                 if (configs[i].type == "DINT") {
-                    value.int_ = *(int*)response.results[i].value.data;
+                    value.i = *(int*)response.results[i].value.data;
                 }
                 if (configs[i].type == "UINT" || configs[i].type == "WORD") {
-                    value.uint_ = *(unsigned int*)response.results[i].value.data;
+                    value.u = *(unsigned int*)response.results[i].value.data;
                 }
                 if (configs[i].type == "UDINT" || configs[i].type == "DWORD") {
-                    value.uint_ = *(unsigned int*)response.results[i].value.data;
+                    value.u = *(unsigned int*)response.results[i].value.data;
                 }
                 if (configs[i].type == "REAL") {
-                    value.float_ = *(float*)response.results[i].value.data;
+                    value.f = *(float*)response.results[i].value.data;
                 }
                 if (configs[i].type == "STRING") {
-                    value.string_ = *(std::string*)response.results[i].value.data;
+                    value.s = *(std::string*)response.results[i].value.data;
                 }
-
-                results[node_id] = {.value = value, .source_timestamp = source_timestamp, .quality = quality};
+                results[node_id] = { value };
             }
         }
     } else {
@@ -181,32 +180,32 @@ void OpcUaClient::Write(WriteConfig& config) {
         if (config.type == "INT") {
             item.value.value.type = &UA_TYPES[UA_TYPES_INT16];
             item.value.value.storageType = UA_VARIANT_DATA_NODELETE;
-            item.value.value.data = &config.value.int_;
+            item.value.value.data = &config.value.i;
         }
         if (config.type == "DINT") {
             item.value.value.type = &UA_TYPES[UA_TYPES_INT32];
             item.value.value.storageType = UA_VARIANT_DATA_NODELETE;
-            item.value.value.data = &config.value.int_;
+            item.value.value.data = &config.value.i;
         }
          if (config.type == "UINT" || config.type == "WORD") {
             item.value.value.type = &UA_TYPES[UA_TYPES_UINT16];
             item.value.value.storageType = UA_VARIANT_DATA_NODELETE;
-            item.value.value.data = &config.value.uint_;
+            item.value.value.data = &config.value.u;
         }
         if (config.type == "UDINT" || config.type == "DWORD") {
             item.value.value.type = &UA_TYPES[UA_TYPES_UINT32];
             item.value.value.storageType = UA_VARIANT_DATA_NODELETE;
-            item.value.value.data = &config.value.uint_;
+            item.value.value.data = &config.value.u;
         }
         if (config.type == "REAL") {
             item.value.value.type = &UA_TYPES[UA_TYPES_FLOAT];
             item.value.value.storageType = UA_VARIANT_DATA_NODELETE;
-            item.value.value.data = &config.value.float_;
+            item.value.value.data = &config.value.f;
         }
         if (config.type == "STRING") {
             item.value.value.type = &UA_TYPES[UA_TYPES_STRING];
             item.value.value.storageType = UA_VARIANT_DATA_NODELETE;
-            item.value.value.data = &config.value.string_;
+            item.value.value.data = &config.value.s;
         }
         item.value.hasValue = true;
     }
@@ -245,32 +244,32 @@ void OpcUaClient::Write(std::vector<WriteConfig>& configs) {
             if (configs[i].type == "INT") {
                 items[j].value.value.type = &UA_TYPES[UA_TYPES_INT16];
                 items[j].value.value.storageType = UA_VARIANT_DATA_NODELETE;
-                items[j].value.value.data = &configs[i].value.int_;
+                items[j].value.value.data = &configs[i].value.i;
             }
             if (configs[i].type == "DINT") {
                 items[j].value.value.type = &UA_TYPES[UA_TYPES_INT32];
                 items[j].value.value.storageType = UA_VARIANT_DATA_NODELETE;
-                items[j].value.value.data = &configs[i].value.int_;
+                items[j].value.value.data = &configs[i].value.i;
             }
              if (configs[i].type == "UINT" || configs[i].type == "WORD") {
                 items[j].value.value.type = &UA_TYPES[UA_TYPES_UINT16];
                 items[j].value.value.storageType = UA_VARIANT_DATA_NODELETE;
-                items[j].value.value.data = &configs[i].value.uint_;
+                items[j].value.value.data = &configs[i].value.u;
             }
             if (configs[i].type == "UDINT" || configs[i].type == "DWORD") {
                 items[j].value.value.type = &UA_TYPES[UA_TYPES_UINT32];
                 items[j].value.value.storageType = UA_VARIANT_DATA_NODELETE;
-                items[j].value.value.data = &configs[i].value.uint_;
+                items[j].value.value.data = &configs[i].value.u;
             }
             if (configs[i].type == "REAL") {
                 items[j].value.value.type = &UA_TYPES[UA_TYPES_FLOAT];
                 items[j].value.value.storageType = UA_VARIANT_DATA_NODELETE;
-                items[j].value.value.data = &configs[i].value.float_;
+                items[j].value.value.data = &configs[i].value.f;
             }
             if (configs[i].type == "STRING") {
                 items[j].value.value.type = &UA_TYPES[UA_TYPES_STRING];
                 items[j].value.value.storageType = UA_VARIANT_DATA_NODELETE;
-                items[j].value.value.data = &configs[i].value.string_;
+                items[j].value.value.data = &configs[i].value.s;
             }
             items[j].value.hasValue = true;
 
@@ -492,7 +491,7 @@ bool OpcUaClient::Connect() {
     return is_connected_;
 }
 
-bool OpcUaClient::Connect(const std::string ip, int port) {
+bool OpcUaClient::Connect(const std::string ip, const int port) {
     ip_ = ip;
     port_ = port;
 
