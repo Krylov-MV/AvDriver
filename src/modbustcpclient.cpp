@@ -31,6 +31,7 @@ void ModbusTcpClient::ReadHoldingRegisters(const std::vector<std::vector<Industr
                     } else {
                         Disconnect();
                     }
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 }
             }
         }
@@ -56,6 +57,8 @@ void ModbusTcpClient::WriteHoldingRegisters(const std::vector<std::vector<Indust
                         Disconnect();
                     }
                 }
+
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
         }
     }

@@ -93,8 +93,8 @@ void ModbusTcpToOpcUa(const IndustrialProtocolUtils::ModbusTcpDeviceConfig &modb
         for (unsigned long j = 0; j < data_results[i].size(); j++) {
             datas.push_back(data_results[i][j]);
         }
-        if (datas_old.empty() && !datas.empty()) { datas_old = datas; force_write = true; }
     }
+    if (datas_old.empty() && !datas.empty()) { datas_old = datas; force_write = true; }
 
     std::vector<IndustrialProtocolUtils::DataResult> datas_new;
 
@@ -335,7 +335,6 @@ int main() {
 
         if (link_is_fail) {
             std::cout << "Нет связи с Modbus устройством" << std::endl;
-            if (!datas_old.empty()) datas_old.clear();
             std::this_thread::sleep_for(std::chrono::milliseconds(5000));
             continue;
         }

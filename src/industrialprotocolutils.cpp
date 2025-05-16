@@ -231,8 +231,8 @@ void IndustrialProtocolUtils::ReadConfig (IndustrialProtocolUtils::ModbusTcpDevi
         std::sort(opc_to_modbus_tcp_configs.begin(), opc_to_modbus_tcp_configs.end(),
             [](const IndustrialProtocolUtils::DataConfig &a, const IndustrialProtocolUtils::DataConfig &b) { return a.address < b.address; });
     }
-    //for (auto config : opc_to_modbus_tcp_configs) {
-    //    std::cout << config.address << " " << config.name << std::endl;
+    //for (auto config : modbus_tcp_to_opc_configs) {
+    //    std::cout << config.address << " " << config.name << " " << std::endl;
     //}
     //while(true) {}
 }

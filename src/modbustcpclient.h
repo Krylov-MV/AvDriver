@@ -5,6 +5,8 @@
 
 #include <vector>
 #include <modbus/modbus.h>
+#include <thread>
+#include <chrono>
 
 #pragma once
 
