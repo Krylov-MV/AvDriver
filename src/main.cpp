@@ -136,6 +136,8 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
             //std::cout << data_results[i].time_current << std::endl;
             //std::cout << data_results[i].time_previos << std::endl;
             data_results[i].time_previos = data_results[i].time_current;
+            //std::cout << data_results[i].value.f << std::endl;
+            //std::cout << data_results[i].name << std::endl;
             if (modbus_configs.empty()) {
                 modbus_configs.push_back({ .address = data_results[i].address, .type = data_results[i].type, .name = data_results[i].name });
 
@@ -169,7 +171,7 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
                 bool new_thread = data_results[i].address > data_results[i - 1].address + ModbusTcpClient::GetLength(data_results[i - 1].type);
 
                 if (length > 100 || new_thread) {
-                    //std::cout << "new" << std::endl;
+                    //std::cout << modbus_configs.size() << std::endl;
                     //std::cout << start_address << std::endl;
                     //std::cout << length << std::endl;
                     thread_modbus_configs.push_back(modbus_configs);
@@ -221,8 +223,7 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
 
     //Собираем группы в потоки по числу максимального количества соединений
     //std::cout << "//Собираем группы в потоки по числу максимального количества соединений" << std::endl;
-    std::vector<std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>> thread_modbus_tcp_to_opc_configs(modbus_tcp_device_config.max_socket_in_eth * 4);
-    std::vector<std::vector<std::vector<uint16_t>>> threads_datas(modbus_tcp_device_config.max_socket_in_eth * 4);
+
 
     uint max_socket_in_eth = 0;
     for (unsigned int i = 0; i < modbus_tcp_clients.size(); i++) {
@@ -231,18 +232,28 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
         }
     }
 
+    std::vector<std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>> thread_modbus_tcp_to_opc_configs(max_socket_in_eth);
+    std::vector<std::vector<std::vector<uint16_t>>> threads_datas(max_socket_in_eth);
+
     uint max_thread_in_eth = thread_modbus_configs.size() / max_socket_in_eth + thread_modbus_configs.size() % max_socket_in_eth;
+
+    std::cout << "max_thread - " << max_thread_in_eth << std::endl;
     for (uint i = 0; i < max_socket_in_eth; i++) {
         for (uint j = i * max_thread_in_eth; j < i * max_thread_in_eth + max_thread_in_eth; j++) {
-            if (j >= max_thread_in_eth) { break; }
-            thread_modbus_tcp_to_opc_configs[i].push_back(thread_modbus_configs[j]);
-            threads_datas[i].push_back(thread_datas[j]);
+            if (thread_modbus_configs.size() > j) {
+                thread_modbus_tcp_to_opc_configs[i].push_back(thread_modbus_configs[j]);
+                threads_datas[i].push_back(thread_datas[j]);
+            }
         }
     }
 
+    std::cout << thread_modbus_tcp_to_opc_configs[0].size() << std::endl;
+    std::cout << thread_modbus_tcp_to_opc_configs[1].size() << std::endl;
+    std::cout << thread_modbus_tcp_to_opc_configs[2].size() << std::endl;
+
     std::vector<std::thread> threads;
 
-    for (unsigned long i = 0; i < thread_modbus_tcp_to_opc_configs.size(); i++) {
+    for (unsigned long i = 0; i < max_socket_in_eth; i++) {
         if (!thread_modbus_tcp_to_opc_configs[i].empty())
         {
             threads.emplace_back([&,i] () {ThreadModbusTcpClientWrite(modbus_tcp_clients[i], thread_modbus_tcp_to_opc_configs[i], threads_datas[i]);});
