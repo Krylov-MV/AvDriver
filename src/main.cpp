@@ -131,7 +131,7 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
 
     uint start_address = data_results[0].address;
     for (unsigned int i = 0; i < data_results.size(); i ++) {
-        //if (data_results[i].time_previos == 0) { data_results[i].time_previos = data_results[i].time_current; }
+        if (data_results[i].time_previos == 0) { data_results[i].time_previos = data_results[i].time_current; }
         if (data_results[i].time_current > data_results[i].time_previos && (data_results[i].quality >= UA_STATUSCODE_GOOD && data_results[i].quality <= UA_STATUSCODE_UNCERTAIN)) {
             //std::cout << data_results[i].time_current << std::endl;
             //std::cout << data_results[i].time_previos << std::endl;
@@ -237,7 +237,6 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
 
     uint max_thread_in_eth = thread_modbus_configs.size() / max_socket_in_eth + thread_modbus_configs.size() % max_socket_in_eth;
 
-    std::cout << "max_thread - " << max_thread_in_eth << std::endl;
     for (uint i = 0; i < max_socket_in_eth; i++) {
         for (uint j = i * max_thread_in_eth; j < i * max_thread_in_eth + max_thread_in_eth; j++) {
             if (thread_modbus_configs.size() > j) {
@@ -246,10 +245,6 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
             }
         }
     }
-
-    std::cout << thread_modbus_tcp_to_opc_configs[0].size() << std::endl;
-    std::cout << thread_modbus_tcp_to_opc_configs[1].size() << std::endl;
-    std::cout << thread_modbus_tcp_to_opc_configs[2].size() << std::endl;
 
     std::vector<std::thread> threads;
 

@@ -53,8 +53,9 @@ void ModbusTcpClient::WriteHoldingRegisters(const std::vector<std::vector<Indust
 
                 if (is_connected_) {
                     int rc = modbus_write_registers(ctx_, start_address, lenght, tab_reg);
+                    //std::cout << start_address << std::endl;
                     if (rc < 0) {
-                        std::cout << "start_address - " << start_address << " lenght - " << lenght << std::endl;
+                        //std::cout << "start_address - " << start_address << " lenght - " << lenght << std::endl;
                         Disconnect();
                     }
                 }
