@@ -129,7 +129,7 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
     std::vector<IndustrialProtocolUtils::DataConfig> modbus_configs;
     std::vector<uint16_t> datas;
 
-    int count = 0;
+    //int count = 0;
     uint start_address = data_results[0].address;
     for (unsigned int i = 0; i < data_results.size(); i ++) {
         if (data_results[i].time_previos == 0) { data_results[i].time_previos = data_results[i].time_current; }
@@ -138,8 +138,8 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
             //std::cout << data_results[i].time_previos << std::endl;
             data_results[i].time_previos = data_results[i].time_current;
             //std::cout << data_results[i].value.f << std::endl;
-            count++;
-            std::cout << count << " - " << data_results[i].name << " - " << data_results[i].value.f << " Адресс - " << data_results[i].address << " Длинна - " << ModbusTcpClient::GetLength(data_results[i].type) << std::endl;
+            //count++;
+            //std::cout << count << " - " << data_results[i].name << " - " << data_results[i].value.f << " Адресс - " << data_results[i].address << " Длинна - " << ModbusTcpClient::GetLength(data_results[i].type) << std::endl;
             if (modbus_configs.empty()) {
                 modbus_configs.push_back({ .address = data_results[i].address, .type = data_results[i].type, .name = data_results[i].name });
 
@@ -285,7 +285,7 @@ int main() {
     while (true) {
         //Если нет связи с OPC сервером, то нет смысла обрабатывать логику
         if (!opc_ua_client.CheckConnection()) {
-            std::cout << "Нет связи с OPC сервером" << std::endl;
+            //std::cout << "Нет связи с OPC сервером" << std::endl;
             if (!datas_old.empty()) datas_old.clear();
             std::this_thread::sleep_for(std::chrono::milliseconds(5000));
             continue;
@@ -342,7 +342,7 @@ int main() {
         }
 
         if (link_is_fail) {
-            std::cout << "Нет связи с Modbus устройством" << std::endl;
+            //std::cout << "Нет связи с Modbus устройством" << std::endl;
             std::this_thread::sleep_for(std::chrono::milliseconds(5000));
             continue;
         }
