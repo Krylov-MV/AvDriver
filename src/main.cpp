@@ -129,6 +129,7 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
     std::vector<IndustrialProtocolUtils::DataConfig> modbus_configs;
     std::vector<uint16_t> datas;
 
+    int count = 0;
     uint start_address = data_results[0].address;
     for (unsigned int i = 0; i < data_results.size(); i ++) {
         if (data_results[i].time_previos == 0) { data_results[i].time_previos = data_results[i].time_current; }
@@ -137,7 +138,8 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
             //std::cout << data_results[i].time_previos << std::endl;
             data_results[i].time_previos = data_results[i].time_current;
             //std::cout << data_results[i].value.f << std::endl;
-            //std::cout << data_results[i].name << std::endl;
+            count++;
+            std::cout << count << " - " << data_results[i].name << " - " << data_results[i].value.f << " Адресс - " << data_results[i].address << " Длинна - " << ModbusTcpClient::GetLength(data_results[i].type) << std::endl;
             if (modbus_configs.empty()) {
                 modbus_configs.push_back({ .address = data_results[i].address, .type = data_results[i].type, .name = data_results[i].name });
 
@@ -170,7 +172,7 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
                 uint length = data_results[i].address - start_address + ModbusTcpClient::GetLength(data_results[i].type);
                 bool new_thread = data_results[i].address > data_results[i - 1].address + ModbusTcpClient::GetLength(data_results[i - 1].type);
 
-                if (length > 100 || new_thread) {
+                if (length > 100 || new_thread || true) {
                     //std::cout << modbus_configs.size() << std::endl;
                     //std::cout << start_address << std::endl;
                     //std::cout << length << std::endl;
