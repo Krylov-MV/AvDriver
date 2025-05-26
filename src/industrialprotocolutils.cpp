@@ -26,7 +26,7 @@ bool IndustrialProtocolUtils::IsIPAddress(const std::string& ip) {
     return true;
 }
 
-#include "tinyxml2.h"
+#include <tinyxml2/tinyxml2.h>
 
 int IndustrialProtocolUtils::ReadConfigXml () {
     tinyxml2::XMLDocument doc;
