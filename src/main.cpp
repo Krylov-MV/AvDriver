@@ -110,6 +110,7 @@ void ModbusTcpToOpcUa(const IndustrialProtocolUtils::ModbusTcpDeviceConfig &modb
     if (!datas_new.empty()) { opc_ua_client.WriteDatas(datas_new); }
 }
 
+bool first_cicle = true;
 void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_device_config,
                       const std::vector<IndustrialProtocolUtils::DataConfig> &opc_to_modbus_tcp_configs,
                       std::vector<IndustrialProtocolUtils::DataResult>& data_results,
@@ -132,7 +133,7 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
     //int count = 0;
     uint start_address = data_results[0].address;
     for (unsigned int i = 0; i < data_results.size(); i ++) {
-        if (data_results[i].time_previos == 0) { data_results[i].time_previos = data_results[i].time_current; }
+        //if (data_results[i].time_previos == 0) { data_results[i].time_previos = data_results[i].time_current; }
         if (data_results[i].time_current > data_results[i].time_previos && (data_results[i].quality >= UA_STATUSCODE_GOOD && data_results[i].quality <= UA_STATUSCODE_UNCERTAIN)) {
             //std::cout << data_results[i].time_current << std::endl;
             //std::cout << data_results[i].time_previos << std::endl;
@@ -251,7 +252,7 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
     std::vector<std::thread> threads;
 
     for (unsigned long i = 0; i < max_socket_in_eth; i++) {
-        if (!thread_modbus_tcp_to_opc_configs[i].empty())
+        if (!thread_modbus_tcp_to_opc_configs[i].empty() && !first_cicle)
         {
             threads.emplace_back([&,i] () {ThreadModbusTcpClientWrite(modbus_tcp_clients[i], thread_modbus_tcp_to_opc_configs[i], threads_datas[i]);});
         }
@@ -262,6 +263,8 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
             th.join();
         }
     }
+
+    first_cicle = false;
 }
 
 int main() {
