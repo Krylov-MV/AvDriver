@@ -347,6 +347,7 @@ int main() {
         if (link_is_fail) {
             //std::cout << "Нет связи с Modbus устройством" << std::endl;
             std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+            if (!datas_old.empty()) datas_old.clear();
             continue;
         }
 
