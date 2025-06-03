@@ -12,16 +12,12 @@
 
 class ModbusTcpClient {
 public:
-    ModbusTcpClient(const std::string& ip, int port)
-        : ip_(ip), port_(port), is_connected_(false), should_run_(true) {
-        Connect();
-    }
-    ModbusTcpClient()
-        : is_connected_(false), should_run_(true) {
-    }
+    ModbusTcpClient(const std::string& ip, int port, int timeout)
+        : ip_(ip), port_(port), timeout_(timeout), is_connected_(false), should_run_(true) {}
 
     ~ModbusTcpClient() {
         should_run_ = false;
+        modbus_close(ctx_);
         modbus_free(ctx_);
     }
 
@@ -31,9 +27,7 @@ public:
 
     bool CheckConnection();
 
-    void Connect();
-
-    bool Connect(const std::string ip, const int port);
+    bool Connect();
 
     void Disconnect();
 
@@ -42,6 +36,7 @@ public:
 private:
     std::string ip_;
     int port_;
+    int timeout_;
     modbus_t* ctx_;
     bool is_connected_;
     bool should_run_;

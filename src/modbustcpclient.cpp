@@ -31,7 +31,6 @@ void ModbusTcpClient::ReadHoldingRegisters(const std::vector<std::vector<Industr
                     } else {
                         Disconnect();
                     }
-                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 }
             }
         }
@@ -59,8 +58,6 @@ void ModbusTcpClient::WriteHoldingRegisters(const std::vector<std::vector<Indust
                         Disconnect();
                     }
                 }
-
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
         }
     }
@@ -70,33 +67,27 @@ bool ModbusTcpClient::CheckConnection() {
     return is_connected_;
 }
 
-void ModbusTcpClient::Connect() {
+bool ModbusTcpClient::Connect() {
     ctx_ = modbus_new_tcp(ip_.c_str(), port_);
-    if (modbus_connect(ctx_) == -1) {
-        is_connected_ = false;
-    } else {
-        is_connected_ = true;
-    }
-}
+    uint32_t timeout_sec = timeout_ / 1000;
+    uint32_t timeout_usec = timeout_ % 1000 * 1000;
+    modbus_set_response_timeout(ctx_, timeout_sec, timeout_usec);
 
-bool ModbusTcpClient::Connect(const std::string ip, const int port) {
-    ip_ = ip;
-    port_ = port;
-    ctx_ = modbus_new_tcp(ip_.c_str(), port_);
     if (modbus_connect(ctx_) == -1) {
         is_connected_ = false;
-        return false;
+        modbus_close(ctx_);
+        modbus_free(ctx_);
     } else {
         is_connected_ = true;
-        return true;
     }
+
+    return is_connected_;
 }
 
 void ModbusTcpClient::Disconnect() {
-    if (is_connected_) {
-        is_connected_ = false;
-        modbus_close(ctx_);
-    }
+    is_connected_ = false;
+    modbus_close(ctx_);
+    modbus_free(ctx_);
 }
 
 int ModbusTcpClient::GetLength(const IndustrialProtocolUtils::DataType& type) {

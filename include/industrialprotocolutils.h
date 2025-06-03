@@ -8,6 +8,7 @@
 #include <open62541/client.h>
 #include <vector>
 #include <algorithm>
+#include <mutex>
 
 #pragma once
 
@@ -20,15 +21,12 @@ public:
     enum class ModbusEthWorkType { ONE_ETH_OSN_OR_ONE_ETH_REZ, ONE_ETH_OSN_AND_ONE_ETH_REZ, TWO_ETH_OSN_OR_TWO_ETH_REZ, ALL_ETH };
 
     struct ModbusTcpDeviceConfig {
-        std::string eth_osn_ip_osn = "";
-        std::string eth_osn_ip_rez = "";
-        std::string eth_rez_ip_osn = "";
-        std::string eth_rez_ip_rez = "";
+        std::vector<std::string> ip;
         uint port = 502;
         ModbusEthWorkType eth_work_type = ModbusEthWorkType::ONE_ETH_OSN_OR_ONE_ETH_REZ;
         uint max_socket_in_eth = 2;
         uint timeout_reconnect = 5000;
-        uint timeout_read_write = 10;
+        uint timeout;
         bool mapping_full_allow = true;
     };
 
@@ -69,10 +67,12 @@ public:
 
     static bool IsIPAddress(const std::string& ip);
 
-    static void ReadConfig (IndustrialProtocolUtils::ModbusTcpDeviceConfig &modbus_tcp_device_config, std::vector<IndustrialProtocolUtils::DataConfig> &modbus_tcp_to_opc_configs,
+    static void ReadConfig(IndustrialProtocolUtils::ModbusTcpDeviceConfig &modbus_tcp_device_config, std::vector<IndustrialProtocolUtils::DataConfig> &modbus_tcp_to_opc_configs,
                             IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_device_config, std::vector<IndustrialProtocolUtils::DataConfig> &opc_to_modbus_tcp_configs);
 
-    static int ReadConfigXml ();
+    static int ReadConfigXml();
+
+    static void Log(const std::string &log_text);
 };
 
 #endif // INDUSTRIALPROTOCOLUTILS_H

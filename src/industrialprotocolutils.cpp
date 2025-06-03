@@ -1,4 +1,9 @@
 #include "industrialprotocolutils.h"
+#include <tinyxml2/tinyxml2.h>
+#include <chrono>
+#include <iomanip>
+
+std::mutex file_mutex;  // Мьютекс для защиты доступа к файлу
 
 std::vector<std::string> IndustrialProtocolUtils::Split(const std::string &str, const char delimiter) {
     std::vector<std::string> tokens;
@@ -26,14 +31,16 @@ bool IndustrialProtocolUtils::IsIPAddress(const std::string& ip) {
     return true;
 }
 
-#include <tinyxml2/tinyxml2.h>
+void IndustrialProtocolUtils::ReadConfig(IndustrialProtocolUtils::ModbusTcpDeviceConfig &modbus_tcp_device_config,
+                                         std::vector<IndustrialProtocolUtils::DataConfig> &modbus_tcp_to_opc_configs,
+                                         IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_device_config,
+                                         std::vector<IndustrialProtocolUtils::DataConfig> &opc_to_modbus_tcp_configs) {
 
-int IndustrialProtocolUtils::ReadConfigXml () {
     tinyxml2::XMLDocument doc;
     // Загружаем XML файл
     if (doc.LoadFile("AvDriver.xml") != tinyxml2::XML_SUCCESS) {
         std::cerr << "Ошибка при загрузке файла: " << doc.ErrorIDToName(doc.ErrorID()) << std::endl;
-        //return -1;
+        return;
     }
 
     // Получаем корневой элемент
@@ -41,56 +48,7 @@ int IndustrialProtocolUtils::ReadConfigXml () {
     tinyxml2::XMLElement* root = doc.RootElement();
     if (root == nullptr) {
         std::cerr << "Ошибка: корневой элемент отсутствует." << std::endl;
-        //return -1;
-    }
-
-    tinyxml2::XMLElement* programm = root->FirstChildElement("AvDriver");
-    tinyxml2::XMLElement* devices = programm->FirstChildElement("devices");
-
-    // Перебираем все элементы device
-    for (tinyxml2::XMLElement* device = devices->FirstChildElement("device"); device != nullptr; device = device->NextSiblingElement("device")) {
-        std::string device_name = device->FirstChildElement("name")->GetText();
-        std::string device_type = device->FirstChildElement("type")->GetText();
-        std::vector<std::string> device_connections;
-        int device_max_socket = device->FirstChildElement("settings")->FirstChildElement("max_socket")->IntText();
-        //device->FirstChildElement("settings")->FirstChildElement("max_socket")->QueryIntText(&device_max_socket);
-
-        // Получаем настройки
-        tinyxml2::XMLElement* settings = device->FirstChildElement("settings");
-        if (settings) {
-            tinyxml2::XMLElement* connections = settings->FirstChildElement("connections");
-            if (connections) {
-                for (tinyxml2::XMLElement* connection = connections->FirstChildElement("connection"); connection != nullptr; connection = connection->NextSiblingElement("connection")) {
-                    if (connection) {
-                        device_connections.push_back(connection->GetText());
-                    }
-                }
-            }
-        }
-
-        if (device_type == "ModbusTcpClient") {
-        }
-    }
-}
-
-void IndustrialProtocolUtils::ReadConfig (IndustrialProtocolUtils::ModbusTcpDeviceConfig &modbus_tcp_device_config,
-                                          std::vector<IndustrialProtocolUtils::DataConfig> &modbus_tcp_to_opc_configs,
-                                          IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_device_config,
-                                          std::vector<IndustrialProtocolUtils::DataConfig> &opc_to_modbus_tcp_configs) {
-
-    tinyxml2::XMLDocument doc;
-    // Загружаем XML файл
-    if (doc.LoadFile("AvDriver.xml") != tinyxml2::XML_SUCCESS) {
-        std::cerr << "Ошибка при загрузке файла: " << doc.ErrorIDToName(doc.ErrorID()) << std::endl;
-        //return -1;
-    }
-
-    // Получаем корневой элемент
-    std::string str = "AvDriver";
-    tinyxml2::XMLElement* root = doc.RootElement();
-    if (root == nullptr) {
-        std::cerr << "Ошибка: корневой элемент отсутствует." << std::endl;
-        //return -1;
+        return;
     }
 
     tinyxml2::XMLElement* programm = root->FirstChildElement("AvDriver");
@@ -103,6 +61,7 @@ void IndustrialProtocolUtils::ReadConfig (IndustrialProtocolUtils::ModbusTcpDevi
         std::vector<std::string> device_connections;
         int device_max_socket = 1;
         int device_port = 502;
+        int device_timeout = 2000;
         bool device_mapping_full_allow = true;
         if (device->FirstChildElement("settings")->FirstChildElement("max_socket")) {
             device_max_socket = device->FirstChildElement("settings")->FirstChildElement("max_socket")->IntText();
@@ -111,7 +70,10 @@ void IndustrialProtocolUtils::ReadConfig (IndustrialProtocolUtils::ModbusTcpDevi
             device_port = device->FirstChildElement("settings")->FirstChildElement("port")->IntText();
         }
         if (device->FirstChildElement("settings")->FirstChildElement("mapping_full_allow")) {
-            device_mapping_full_allow = device->FirstChildElement("settings")->FirstChildElement("port")->BoolText();
+            device_mapping_full_allow = device->FirstChildElement("settings")->FirstChildElement("mapping_full_allow")->BoolText();
+        }
+        if (device->FirstChildElement("settings")->FirstChildElement("timeout")) {
+            device_timeout = device->FirstChildElement("settings")->FirstChildElement("timeout")->IntText();
         }
 
         // Получаем настройки
@@ -127,27 +89,18 @@ void IndustrialProtocolUtils::ReadConfig (IndustrialProtocolUtils::ModbusTcpDevi
             }
         }
 
-
-
         if (device_type == "ModbusTcpClient") {
             if (device_max_socket < 0 || device_max_socket > 16) device_max_socket = 1;
             if (device_port < 0 || device_port > 65535) device_port = 502;
+            if (device_timeout < 1000 || device_timeout > 32000) device_timeout = 1000;
 
             modbus_tcp_device_config.max_socket_in_eth = device_max_socket;
             modbus_tcp_device_config.port = device_port;
             modbus_tcp_device_config.mapping_full_allow = device_mapping_full_allow;
+            modbus_tcp_device_config.timeout = device_timeout;
 
-            if (device_connections.size() > 0) {
-                if (IsIPAddress(device_connections[0])) { modbus_tcp_device_config.eth_osn_ip_osn = device_connections[0]; }
-            }
-            if (device_connections.size() > 1) {
-                if (IsIPAddress(device_connections[1])) { modbus_tcp_device_config.eth_osn_ip_rez = device_connections[1]; }
-            }
-            if (device_connections.size() > 2) {
-                if (IsIPAddress(device_connections[2])) { modbus_tcp_device_config.eth_rez_ip_osn = device_connections[2]; }
-            }
-            if (device_connections.size() > 3) {
-                if (IsIPAddress(device_connections[3])) { modbus_tcp_device_config.eth_rez_ip_rez = device_connections[3]; }
+            for (const auto &device_connection : device_connections) {
+                if (IsIPAddress(device_connection)) { modbus_tcp_device_config.ip.push_back(device_connection); }
             }
         }
 
@@ -231,8 +184,21 @@ void IndustrialProtocolUtils::ReadConfig (IndustrialProtocolUtils::ModbusTcpDevi
         std::sort(opc_to_modbus_tcp_configs.begin(), opc_to_modbus_tcp_configs.end(),
             [](const IndustrialProtocolUtils::DataConfig &a, const IndustrialProtocolUtils::DataConfig &b) { return a.address < b.address; });
     }
-    //for (auto config : modbus_tcp_to_opc_configs) {
-    //    std::cout << config.address << " " << config.name << " " << std::endl;
-    //}
-    //while(true) {}
+}
+
+void IndustrialProtocolUtils::Log(const std::string &log_text) {
+    // Получаем текущее время
+    auto now = std::chrono::steady_clock::now();
+
+    // Преобразуем текущее время в миллисекундах с начала эпохи
+    auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+
+    // Получаем текущую дату и время
+    std::time_t currentTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    std::tm* pTime = std::localtime(&currentTime);
+
+    // Записываем лог с датой и временем с миллисекундами
+    std::lock_guard<std::mutex> guard(file_mutex); // Блокируем мьютекс
+    std::ofstream log_file("log.txt", std::ios::app);
+    log_file << std::put_time(pTime, "%Y-%m-%d %H:%M:%S") << '.' << (milliseconds % 1000) << ' ' << log_text;
 }
