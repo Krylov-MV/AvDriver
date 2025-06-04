@@ -37,6 +37,65 @@ void ModbusTcpClient::ReadHoldingRegisters(const std::vector<std::vector<Industr
     }
 }
 
+void ModbusTcpClient::ReadHoldingRegistersEx(const std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>& config_datas, std::vector<IndustrialProtocolUtils::DataResult>& data_result) {
+    if (is_connected_) {
+        if (!config_datas.empty()) {
+            data_result.clear();
+
+            for (auto config_data : config_datas) {
+                int start_address = config_data[0].address;
+                int length = config_data[config_data.size() - 1].address + GetLength(config_data[config_data.size() - 1].type) - config_data[0].address;
+
+                if (is_connected_){
+                    uint8_t function = 0x2B;
+                    uint8_t start_address_lower_byte = start_address & 0xFF;
+                    uint8_t start_address_upper_byte = (start_address >> 8) & 0xFF;
+                    uint8_t length_lower_byte = length & 0xFF;
+                    uint8_t length_upper_byte = (length >> 8) & 0xFF;
+
+                    uint8_t request[] = {0x01, function, start_address_upper_byte, start_address_lower_byte, length_upper_byte, length_lower_byte};
+
+                    int rec = modbus_send_raw_request(ctx_, request, sizeof(request));
+
+                    // Получаем ответ
+                    if (rec == -1) {
+                        Disconnect();
+                    } else {
+                        uint8_t response[1446];
+                        int res = modbus_receive_confirmation(ctx_, response);
+                        if (res == -1) {
+                            Disconnect();
+                        } else {
+                            // Обработка полученного ответа
+                            int datas[719];
+                            for (int i = 0; i < length; i++) {
+                                int lower_byte = response[(i * 2) + 10];
+                                int upper_byte = response[(i * 2) + 9];
+                                datas[i] = (upper_byte << 8) + lower_byte;
+                            }
+
+                            unsigned int j = 0;
+                            while (j < config_data.size()) {
+                                uint16_t data[2];
+                                IndustrialProtocolUtils::DataResult result;
+                                data[0] = datas[config_data[j].address - start_address];
+                                if (GetLength(config_data[j].type) == 2) { data[1] = datas[config_data[j].address - start_address + 1]; }
+                                result.name = config_data[j].name;
+                                result.type = config_data[j].type;
+                                result.quality = true;
+                                result.value = GetValue(result.type, data);
+                                result.address = config_data[j].address;
+                                data_result.push_back(result);
+                                j++;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 void ModbusTcpClient::WriteHoldingRegisters(const std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>& config_datas, const std::vector<std::vector<uint16_t>>& data) {
     if (is_connected_) {
         if (!config_datas.empty()) {
