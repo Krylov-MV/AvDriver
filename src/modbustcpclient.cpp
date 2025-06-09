@@ -1,5 +1,39 @@
 #include "modbustcpclient.h"
 
+ModbusTcpClient::ModbusTcpClient(const std::string& ip, int port, int timeout) : ip_(ip), port_(port), timeout_(timeout), is_connected_(false), should_run_(false) {}
+
+ModbusTcpClient::~ModbusTcpClient() {
+    should_run_ = false;
+    modbus_close(ctx_);
+    modbus_free(ctx_);
+}
+
+void ModbusTcpClient::WriteHoldingRegisters(const std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>& config_datas, const std::vector<std::vector<uint16_t>>& data) {
+    if (is_connected_) {
+        if (!config_datas.empty()) {
+            for (unsigned long i = 0; i < config_datas.size(); i++) {
+                uint16_t tab_reg[100];
+                int start_address = config_datas[i][0].address;
+                int lenght = config_datas[i][config_datas[i].size() - 1].address + GetLength(config_datas[i][config_datas[i].size() - 1].type) - config_datas[i][0].address;
+
+                //std::cout << "start_address - " << start_address << " lenght - " << lenght << std::endl;
+                for (unsigned long j = 0; j < data[i].size(); j++) {
+                    tab_reg[j] = data[i][j];
+                }
+
+                if (is_connected_) {
+                    int rc = modbus_write_registers(ctx_, start_address, lenght, tab_reg);
+                    //std::cout << start_address << std::endl;
+                    if (rc < 0) {
+                        //std::cout << "start_address - " << start_address << " lenght - " << lenght << std::endl;
+                        Disconnect();
+                    }
+                }
+            }
+        }
+    }
+}
+
 void ModbusTcpClient::ReadHoldingRegisters(const std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>& config_datas, std::vector<IndustrialProtocolUtils::DataResult>& data_result) {
     if (is_connected_) {
         if (!config_datas.empty()) {
@@ -96,36 +130,6 @@ void ModbusTcpClient::ReadHoldingRegistersEx(const std::vector<std::vector<Indus
     }
 }
 
-void ModbusTcpClient::WriteHoldingRegisters(const std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>& config_datas, const std::vector<std::vector<uint16_t>>& data) {
-    if (is_connected_) {
-        if (!config_datas.empty()) {
-            for (unsigned long i = 0; i < config_datas.size(); i++) {
-                uint16_t tab_reg[100];
-                int start_address = config_datas[i][0].address;
-                int lenght = config_datas[i][config_datas[i].size() - 1].address + GetLength(config_datas[i][config_datas[i].size() - 1].type) - config_datas[i][0].address;
-
-                //std::cout << "start_address - " << start_address << " lenght - " << lenght << std::endl;
-                for (unsigned long j = 0; j < data[i].size(); j++) {
-                    tab_reg[j] = data[i][j];
-                }
-
-                if (is_connected_) {
-                    int rc = modbus_write_registers(ctx_, start_address, lenght, tab_reg);
-                    //std::cout << start_address << std::endl;
-                    if (rc < 0) {
-                        //std::cout << "start_address - " << start_address << " lenght - " << lenght << std::endl;
-                        Disconnect();
-                    }
-                }
-            }
-        }
-    }
-}
-
-bool ModbusTcpClient::CheckConnection() {
-    return is_connected_;
-}
-
 bool ModbusTcpClient::Connect() {
     ctx_ = modbus_new_tcp(ip_.c_str(), port_);
     uint32_t timeout_sec = timeout_ / 1000;
@@ -140,6 +144,10 @@ bool ModbusTcpClient::Connect() {
         is_connected_ = true;
     }
 
+    return is_connected_;
+}
+
+bool ModbusTcpClient::CheckConnection() {
     return is_connected_;
 }
 
