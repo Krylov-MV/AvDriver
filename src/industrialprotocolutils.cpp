@@ -63,6 +63,7 @@ void IndustrialProtocolUtils::ReadConfig(IndustrialProtocolUtils::ModbusTcpDevic
         int device_port = 502;
         int device_timeout = 2000;
         bool device_mapping_full_allow = true;
+        bool device_extended_modbus_tcp = false;
         if (device->FirstChildElement("settings")->FirstChildElement("max_socket")) {
             device_max_socket = device->FirstChildElement("settings")->FirstChildElement("max_socket")->IntText();
         }
@@ -71,6 +72,9 @@ void IndustrialProtocolUtils::ReadConfig(IndustrialProtocolUtils::ModbusTcpDevic
         }
         if (device->FirstChildElement("settings")->FirstChildElement("mapping_full_allow")) {
             device_mapping_full_allow = device->FirstChildElement("settings")->FirstChildElement("mapping_full_allow")->BoolText();
+        }
+        if (device->FirstChildElement("settings")->FirstChildElement("extended_modbus_tcp")) {
+            device_extended_modbus_tcp = device->FirstChildElement("settings")->FirstChildElement("extended_modbus_tcp")->BoolText();
         }
         if (device->FirstChildElement("settings")->FirstChildElement("timeout")) {
             device_timeout = device->FirstChildElement("settings")->FirstChildElement("timeout")->IntText();
@@ -97,6 +101,7 @@ void IndustrialProtocolUtils::ReadConfig(IndustrialProtocolUtils::ModbusTcpDevic
             modbus_tcp_device_config.max_socket_in_eth = device_max_socket;
             modbus_tcp_device_config.port = device_port;
             modbus_tcp_device_config.mapping_full_allow = device_mapping_full_allow;
+            modbus_tcp_device_config.extended_modbus_tcp = device_extended_modbus_tcp;
             modbus_tcp_device_config.timeout = device_timeout;
 
             for (const auto &device_connection : device_connections) {

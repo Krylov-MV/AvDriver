@@ -13,6 +13,7 @@ set(HEADERS
     ${HEADER_DIR}/industrialprotocolutils.h
     ${HEADER_DIR}/modbustcpclient.h
     ${HEADER_DIR}/opcuaclient.h
+    ${HEADER_DIR}/log_duration.h
 )
 
 set(SOURCES
@@ -33,13 +34,11 @@ add_executable(${PROJECT_NAME}
     ${SOURCES}
 )
 
-find_library(LIBMODBUS_LIB NAMES modbus PATHS ${LIB_DIR})
 find_library(OPEN62541_LIB NAMES open62541 PATHS ${LIB_DIR})
 find_library(TINYXML2_LIB NAMES tinyxml2 PATHS ${LIB_DIR})
 
 target_link_libraries(${PROJECT_NAME}
     ${CMAKE_THREAD_LIBS_INIT}
-    ${LIBMODBUS_LIB}
     ${OPEN62541_LIB}
     ${TINYXML2_LIB}
 )

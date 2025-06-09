@@ -3,6 +3,7 @@
 #include "industrialprotocolutils.h"
 #include "modbustcpclient.h"
 #include "opcuaclient.h"
+#include "log_duration.h"
 
 void ThreadModbusTcpClientRead(std::shared_ptr<ModbusTcpClient> modbus_tcp_client, std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>& config_datas, std::vector<IndustrialProtocolUtils::DataResult>& data_result)
 {
@@ -26,6 +27,8 @@ void ModbusTcpToOpcUa(const IndustrialProtocolUtils::ModbusTcpDeviceConfig &modb
     std::vector<std::vector<IndustrialProtocolUtils::DataConfig>> modbus_configs;
     std::vector<std::vector<IndustrialProtocolUtils::DataResult>> data_results(modbus_tcp_device_config.max_socket_in_eth * 4);
 
+    uint max_length = modbus_tcp_device_config.extended_modbus_tcp ? 719 : 125;
+
     uint start_address = modbus_tcp_to_opc_configs[0].address;
     for (unsigned int i = 0; i < modbus_tcp_to_opc_configs.size(); i++) {
         if (configs.empty()) {
@@ -37,7 +40,7 @@ void ModbusTcpToOpcUa(const IndustrialProtocolUtils::ModbusTcpDeviceConfig &modb
                 new_thread = modbus_tcp_to_opc_configs[i].address > modbus_tcp_to_opc_configs[i - 1].address + ModbusTcpClient::GetLength(modbus_tcp_to_opc_configs[i - 1].type);
             }
 
-            if (length > 125 || new_thread) {
+            if (length > max_length || new_thread) {
                 modbus_configs.push_back(configs);
                 configs.clear();
                 start_address = modbus_tcp_to_opc_configs[i].address;
@@ -293,6 +296,7 @@ int main() {
     IndustrialProtocolUtils::Log("Классы Modbus и OPC созданы \n");
 
     while (true) {
+        LOG_DURATION("Total");
         //Если нет связи с OPC сервером, то нет смысла обрабатывать логику
         if (!opc_ua_client.CheckConnection()) {
             IndustrialProtocolUtils::Log("Нет связи с OPC сервером \n");
@@ -327,32 +331,15 @@ int main() {
             continue;
         }
 
-        //std::cout << "Beg OpcUaToModbusTcp" << std::endl;
-        if (!opc_to_modbus_tcp_configs.empty()) OpcUaToModbusTcp(opc_ua_device_config, opc_to_modbus_tcp_configs, opc_to_modbus_results, opc_ua_client, modbus_tcp_device_config, modbus_tcp_clients);
-        //std::cout << "End OpcUaToModbusTcp" << std::endl;
-        //std::cout << "Beg ModbusTcpToOpcUa" << std::endl;
-        if (!modbus_tcp_to_opc_configs.empty()) ModbusTcpToOpcUa(modbus_tcp_device_config, modbus_tcp_to_opc_configs, modbus_tcp_clients, opc_ua_client);
-        //std::cout << "End ModbusTcpToOpcUa" << std::endl;
+        {
+            LOG_DURATION("OpcUaToModbusTcp");
+            if (!opc_to_modbus_tcp_configs.empty()) OpcUaToModbusTcp(opc_ua_device_config, opc_to_modbus_tcp_configs, opc_to_modbus_results, opc_ua_client, modbus_tcp_device_config, modbus_tcp_clients);
+        }
+        {
+            LOG_DURATION("ModbusTcpToOpcUa");
+            if (!modbus_tcp_to_opc_configs.empty()) ModbusTcpToOpcUa(modbus_tcp_device_config, modbus_tcp_to_opc_configs, modbus_tcp_clients, opc_ua_client);
+        }
     }
-
-/*modbus_t *ctx;
-
-uint8_t raw_req[] = { 0xFF, 0x43, 0x00, 0x01, 0x02, 0xCF };
-int req_length;
-uint8_t rsp[1460];
-
-ctx = modbus_new_tcp("127.0.0.1", 502);
-if (modbus_connect(ctx) == -1) {
-    fprintf(stderr, "Connection failed: %s\n", modbus_strerror(errno));
-    modbus_free(ctx);
-    return -1;
-}
-
-req_length = modbus_send_raw_request(ctx, raw_req, 6 * sizeof(uint8_t));
-modbus_receive_confirmation(ctx, rsp);
-
-modbus_close(ctx);
-modbus_free(ctx);*/
 
     return 0;
 }

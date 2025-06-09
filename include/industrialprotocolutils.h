@@ -28,6 +28,7 @@ public:
         uint timeout_reconnect = 5000;
         uint timeout;
         bool mapping_full_allow = true;
+        bool extended_modbus_tcp = true;
     };
 
     struct OpcUaDeviceConfig {
