@@ -1,38 +1,42 @@
 #ifndef MODBUSTCPCLIENT_H
 #define MODBUSTCPCLIENT_H
 
-#include "industrialprotocolutils.h"
-
-#include <vector>
-#include <thread>
-#include <arpa/inet.h>
-
 #pragma once
 
+#include "industrialprotocolutils.h"
+#include <arpa/inet.h>
+
 class ModbusTcpClient {
+
 public:
-    ModbusTcpClient(const std::string ip, const int port, const int timeout);
+    ModbusTcpClient(const std::string ip, const int port, const int timeout, ModbusMemory &memory, std::mutex &mutex_memory);
     ~ModbusTcpClient();
     bool Connect();
     bool CheckConnection();
     void Disconnect();
-    void WriteHoldingRegisters(const std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>& config_datas, const std::vector<std::vector<uint16_t>>& data);
-    void ReadHoldingRegisters(const std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>& config_datas, std::vector<IndustrialProtocolUtils::DataResult>& data_result);
-    void ReadHoldingRegistersEx(const std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>& config_datas, std::vector<IndustrialProtocolUtils::DataResult>& data_result);
-    static int GetLength(const IndustrialProtocolUtils::DataType& type);
+    int ReceiveResponse();
+    void WriteHoldingRegisters(const ModbusClientConfig &config, const uint16_t *value);
+    void ReadHoldingRegisters(const ModbusClientConfig &config);
+    void ReadHoldingRegistersEx(const ModbusClientConfig &config);
 
 private:
     std::string ip_{"127.0.0.1"};
     int port_{502};
     int timeout_{5000};
+    ModbusMemory &memory_;
+    std::mutex &mutex_memory_;
     bool is_connected_{false};
     bool should_run_{false};
-    int transaction_id{1};
+    uint8_t transaction_id_{1};
     int socket_{-1};
     sockaddr_in sockaddr_in_{};
+    std::mutex mutex_transaction_id_;
+    std::map<uint8_t, ModbusCheckRequest> queue_;
 
-    IndustrialProtocolUtils::Value GetValue(const IndustrialProtocolUtils::DataType& type, const uint16_t (&data)[2]);
+private:
     void Stop();
+    void IncTransactionId();
+    int SendRequest(const uint8_t *request);
 };
 
 #endif // MODBUSTCPCLIENT_H

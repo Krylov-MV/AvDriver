@@ -14,8 +14,7 @@ using namespace literals;
 
 class LogDuration {
 public:
-    LogDuration(const std::string& id) : id_(id) {
-    }
+    LogDuration(const std::string& id) : id_(id) {}
 
     ~LogDuration() {
         const auto end_time = steady_clock::now();

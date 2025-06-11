@@ -17,8 +17,8 @@ set(HEADERS
 )
 
 set(SOURCES
-    ${SOURCE_DIR}/main.cpp
     ${SOURCE_DIR}/industrialprotocolutils.cpp
+    ${SOURCE_DIR}/main.cpp
     ${SOURCE_DIR}/modbustcpclient.cpp
     ${SOURCE_DIR}/opcuaclient.cpp
 )

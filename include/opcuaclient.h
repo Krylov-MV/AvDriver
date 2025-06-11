@@ -1,7 +1,6 @@
 #ifndef OPCUACLIENT_H
 #define OPCUACLIENT_H
 
-#include "industrialprotocolutils.h"
 #include <open62541/client.h>
 #include <open62541/plugin/log_stdout.h>
 #include <vector>
@@ -24,16 +23,6 @@ public:
         UA_Client_run_iterate(client_, 100);
 
         Connect();
-    }
-
-    OpcUaClient()
-        : is_connected_(false), should_run_(true) {
-        client_ = UA_Client_new();
-
-        UA_ClientConfig* config = UA_Client_getConfig(client_);
-        *config->logging = UA_Log_Stdout_withLevel(UA_LOGLEVEL_FATAL);
-
-        UA_Client_run_iterate(client_, 100);
     }
 
     ~OpcUaClient() {
@@ -66,38 +55,23 @@ public:
         std::string type;
     };
 
-    Value Read(const ReadConfig& config);
-
+    bool Connect();
+    bool CheckConnection();
+    void Disconnect();
+    void Write(WriteConfig& config);
+    void Write(std::vector<WriteConfig>& configs);
     void Read(const ReadConfig& config, Value& result);
-
     void Read(const std::vector<ReadConfig>& configs, std::map<std::string, Value>& results);
 
-    void Write(WriteConfig& config);
-
-    void Write(std::vector<WriteConfig>& configs);
-
-    void ReadDatas(const std::vector<IndustrialProtocolUtils::DataConfig>& data_configs, std::vector<IndustrialProtocolUtils::DataResult>& data_results);
-
-    void WriteDatas(std::vector<IndustrialProtocolUtils::DataResult>& datas);
-
-    void WriteDatas(const std::vector<IndustrialProtocolUtils::DataConfig>& data_configs, std::vector<IndustrialProtocolUtils::DataResult>& datas);
-
-    bool Connect();
-
-    bool Connect(const std::string ip, const int port);
-
-    void Disconnect();
-
-    bool CheckConnection();
-
 private:
-    std::string ip_ = "127.0.0.1";
-    int port_ = 62544;
+    std::string ip_{"127.0.0.1"};
+    int port_{62544};
     UA_Client* client_;
-    bool is_connected_;
-    bool should_run_;
+    bool is_connected_{false};
+    bool should_run_{false};
     const std::set<std::string> types_ = { "INT", "UINT", "WORD", "DINT", "UDINT", "DWORD", "REAL" };
 
+private:
     void Stop();
 };
 

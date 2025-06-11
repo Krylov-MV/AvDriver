@@ -1,79 +1,75 @@
 #ifndef INDUSTRIALPROTOCOLUTILS_H
 #define INDUSTRIALPROTOCOLUTILS_H
 
+#pragma once
+
+#include <open62541/client.h>
+#include <tinyxml2/tinyxml2.h>
 #include <iostream>
 #include <sstream>
 #include <fstream>
 #include <string>
-#include <open62541/client.h>
 #include <vector>
 #include <algorithm>
 #include <mutex>
+#include <map>
+#include <queue>
+#include <chrono>
+#include <iomanip>
 
-#pragma once
+std::mutex file_mutex;
 
-class IndustrialProtocolUtils {
-public:
-    enum class ModbusMemoryType { DiscreteInputs, Coils, InputRegisters, HoldingRegisters };
-
-    enum class DataType { BOOL, BYTE, INT, UINT, WORD, DINT, UDINT, DWORD, REAL, DOUBLE, STRING };
-
-    enum class ModbusEthWorkType { ONE_ETH_OSN_OR_ONE_ETH_REZ, ONE_ETH_OSN_AND_ONE_ETH_REZ, TWO_ETH_OSN_OR_TWO_ETH_REZ, ALL_ETH };
-
-    struct ModbusTcpDeviceConfig {
-        std::vector<std::string> ip;
-        uint port = 502;
-        ModbusEthWorkType eth_work_type = ModbusEthWorkType::ONE_ETH_OSN_OR_ONE_ETH_REZ;
-        uint max_socket_in_eth = 2;
-        uint timeout_reconnect = 5000;
-        uint timeout;
-        bool mapping_full_allow = true;
-        bool extended_modbus_tcp = true;
-    };
-
-    struct OpcUaDeviceConfig {
-        std::string eth_osn_ip_osn;
-        std::string eth_osn_ip_rez;
-        std::string eth_rez_ip_osn;
-        std::string eth_rez_ip_rez;
-        uint port;
-        ModbusEthWorkType eth_work_type;
-        uint timeout_reconnect;
-        uint timeout_read_write;
-    };
-
-    struct DataConfig {
-        uint address;
-        DataType type;
-        std::string name;
-    };
-
-    struct Value {
-        int i;
-        uint u;
-        float f;
-    };
-
-    struct DataResult {
-        Value value;
-        UA_StatusCode quality;
-        DataType type;
-        uint address;
-        std::string name;
-        UA_DateTime time_previos;
-        UA_DateTime time_current;
-    };
-
-    static std::vector<std::string> Split(const std::string &str, const char delimiter);
-
-    static bool IsIPAddress(const std::string& ip);
-
-    static void ReadConfig(IndustrialProtocolUtils::ModbusTcpDeviceConfig &modbus_tcp_device_config, std::vector<IndustrialProtocolUtils::DataConfig> &modbus_tcp_to_opc_configs,
-                            IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_device_config, std::vector<IndustrialProtocolUtils::DataConfig> &opc_to_modbus_tcp_configs);
-
-    static int ReadConfigXml();
-
-    static void Log(const std::string &log_text);
+struct ModbusTcpClientDeviceConfig {
+    std::vector<std::string> addr;
+    uint port;
+    uint max_socket_in_eth;
+    uint timeout;
+    bool mapping_full_allow;
+    bool extended_modbus_tcp;
 };
+
+struct ModbusClientConfig {
+    uint16_t addr;
+    uint16_t len;
+};
+
+struct ModbusValue {
+    uint16_t value;
+    uint8_t quality;
+    uint64_t timestamp_receive;
+};
+
+struct ModbusCheckRequest {
+    uint8_t function;
+    uint8_t addr_high_byte;
+    uint8_t addr_low_byte;
+    uint8_t len_high_byte;
+    uint8_t len_low_byte;
+};
+
+struct ModbusMemory {
+    std::map<uint16_t, ModbusValue> holding_registers;
+};
+
+struct OpcUaClientDeviceConfig {
+    std::string ip;
+    uint port;
+};
+
+struct OpcUaClientConfig {
+    std::string node_id;
+    std::string type;
+};
+
+static void Log(const std::string &log_text);
+
+static std::vector<std::string> Split(const std::string &str, const char delimiter);
+
+static bool IsIpAddress(const std::string &ip);
+
+void ReadConfig(ModbusTcpClientDeviceConfig &modbus_tcp_client_device_config,
+                std::vector<ModbusClientConfig> &modbus_tcp_client_configs,
+                OpcUaClientDeviceConfig &opc_ua_client_device_config,
+                std::vector<OpcUaClientConfig> &opc_ua_client_configs);
 
 #endif // INDUSTRIALPROTOCOLUTILS_H
