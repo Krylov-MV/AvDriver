@@ -34,7 +34,7 @@ bool ModbusTcpClient::Connect() {
         close(socket_);
         return is_connected_ = false;
     }
-    //std::cout << "Подключение установлено \n";
+    Log("Подключение установлено \n");
 
     // Таймауты на чтение/отправку сообщений
     struct timeval timeout;

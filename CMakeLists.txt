@@ -14,6 +14,8 @@ set(HEADERS
     ${HEADER_DIR}/modbustcpclient.h
     ${HEADER_DIR}/opcuaclient.h
     ${HEADER_DIR}/log_duration.h
+    ${HEADER_DIR}/socket.h
+    ${HEADER_DIR}/variable.h
 )
 
 set(SOURCES
@@ -21,6 +23,8 @@ set(SOURCES
     ${SOURCE_DIR}/main.cpp
     ${SOURCE_DIR}/modbustcpclient.cpp
     ${SOURCE_DIR}/opcuaclient.cpp
+    ${SOURCE_DIR}/socket.cpp
+    ${SOURCE_DIR}/variable.cpp
 )
 
 find_package(Threads REQUIRED)

@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "variable.h"
+
 #include <open62541/client.h>
 #include <tinyxml2/tinyxml2.h>
 #include <iostream>
@@ -17,12 +19,11 @@
 #include <chrono>
 #include <iomanip>
 
-std::mutex file_mutex;
-
 struct ModbusTcpClientDeviceConfig {
     std::vector<std::string> addr;
     uint port;
-    uint max_socket_in_eth;
+    uint max_socket;
+    uint max_request;
     uint timeout;
     bool mapping_full_allow;
     bool extended_modbus_tcp;
@@ -31,6 +32,12 @@ struct ModbusTcpClientDeviceConfig {
 struct ModbusClientConfig {
     uint16_t addr;
     uint16_t len;
+};
+
+struct ModbusClientFullConfig {
+    uint16_t addr;
+    uint16_t len;
+    std::map<std::string, std::shared_ptr<Variable>> variables;
 };
 
 struct ModbusValue {
@@ -47,6 +54,15 @@ struct ModbusCheckRequest {
     uint8_t len_low_byte;
 };
 
+struct ModbusFullCheckRequest {
+    uint8_t function;
+    uint8_t addr_high_byte;
+    uint8_t addr_low_byte;
+    uint8_t len_high_byte;
+    uint8_t len_low_byte;
+    std::map<std::string, std::shared_ptr<Variable>> variables;
+};
+
 struct ModbusMemory {
     std::map<uint16_t, ModbusValue> holding_registers;
 };
@@ -61,7 +77,7 @@ struct OpcUaClientConfig {
     std::string type;
 };
 
-static void Log(const std::string &log_text);
+void Log(const std::string &log_text);
 
 static std::vector<std::string> Split(const std::string &str, const char delimiter);
 

@@ -1,6 +1,10 @@
 #include "industrialprotocolutils.h"
 
-static void Log(const std::string &log_text) {
+using namespace tinyxml2;
+
+void Log(const std::string &log_text) {
+    std::mutex file_mutex;
+
     auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 
     // Получаем текущую дату и время
@@ -44,26 +48,25 @@ void ReadConfig(ModbusTcpClientDeviceConfig &modbus_tcp_client_device_config,
                 OpcUaClientDeviceConfig &opc_ua_client_device_config,
                 std::vector<OpcUaClientConfig> &opc_ua_client_configs) {
 
-    tinyxml2::XMLDocument doc;
+    XMLDocument doc;
     // Загружаем XML файл
-    if (doc.LoadFile("AvDriver.xml") != tinyxml2::XML_SUCCESS) {
+    if (doc.LoadFile("AvDriver.xml") != XML_SUCCESS) {
         Log("Ошибка при загрузке файла");
         return;
     }
 
     // Получаем корневой элемент
-    std::string str = "AvDriver";
-    tinyxml2::XMLElement* root = doc.RootElement();
+    XMLElement* root = doc.RootElement();
     if (root == nullptr) {
         Log("Ошибка: корневой элемент отсутствует");
         return;
     }
 
-    tinyxml2::XMLElement* programm = root->FirstChildElement("AvDriver");
-    tinyxml2::XMLElement* devices = programm->FirstChildElement("devices");
+    XMLElement* programm = root->FirstChildElement("AvDriver");
+    XMLElement* devices = programm->FirstChildElement("devices");
 
     // Перебираем все элементы device
-    for (tinyxml2::XMLElement* device = devices->FirstChildElement("device"); device != nullptr; device = device->NextSiblingElement("device")) {
+    for (XMLElement* device = devices->FirstChildElement("device"); device != nullptr; device = device->NextSiblingElement("device")) {
         std::string device_name = device->FirstChildElement("name")->GetText();
         std::string device_type = device->FirstChildElement("type")->GetText();
         std::vector<std::string> device_connections;
@@ -93,11 +96,11 @@ void ReadConfig(ModbusTcpClientDeviceConfig &modbus_tcp_client_device_config,
         }
 
         // Получаем настройки
-        tinyxml2::XMLElement* settings = device->FirstChildElement("settings");
+        XMLElement* settings = device->FirstChildElement("settings");
         if (settings) {
-            tinyxml2::XMLElement* connections = settings->FirstChildElement("connections");
+            XMLElement* connections = settings->FirstChildElement("connections");
             if (connections) {
-                for (tinyxml2::XMLElement* connection = connections->FirstChildElement("connection"); connection != nullptr; connection = connection->NextSiblingElement("connection")) {
+                for (XMLElement* connection = connections->FirstChildElement("connection"); connection != nullptr; connection = connection->NextSiblingElement("connection")) {
                     if (connection) {
                         device_connections.push_back(connection->GetText());
                     }
@@ -111,7 +114,8 @@ void ReadConfig(ModbusTcpClientDeviceConfig &modbus_tcp_client_device_config,
             if (device_port < 0 || device_port > 65535) device_port = 502;
             if (device_timeout < 1000 || device_timeout > 32000) device_timeout = 1000;
 
-            modbus_tcp_client_device_config.max_socket_in_eth = device_max_socket;
+            modbus_tcp_client_device_config.max_socket = device_max_socket;
+            modbus_tcp_client_device_config.max_request = device_max_request;
             modbus_tcp_client_device_config.port = device_port;
             modbus_tcp_client_device_config.mapping_full_allow = device_mapping_full_allow;
             modbus_tcp_client_device_config.extended_modbus_tcp = device_extended_modbus_tcp;
@@ -133,12 +137,83 @@ void ReadConfig(ModbusTcpClientDeviceConfig &modbus_tcp_client_device_config,
         }
     }
 
-    tinyxml2::XMLElement* configs = programm->FirstChildElement("configs");
+    XMLElement* configs = programm->FirstChildElement("configs");
 
     std::string config_name;
     std::string config_version;
-    for (tinyxml2::XMLElement* config = configs->FirstChildElement("config"); config != nullptr; config = config->NextSiblingElement("config")) {
+    for (XMLElement* config = configs->FirstChildElement("config"); config != nullptr; config = config->NextSiblingElement("config")) {
         config_name = config->FirstChildElement("name")->GetText();
         config_version = config->FirstChildElement("version")->GetText();
+    }
+
+    if (config_version == "0.2") {
+        // Загружаем XML файл
+        if (doc.LoadFile(config_name.c_str()) != XML_SUCCESS) {
+            Log("Ошибка при загрузке файла конфигурации");
+            return;
+        }
+
+        // Получаем корневой элемент
+        root = doc.RootElement();
+        if (root == nullptr) {
+            Log("Ошибка: корневой элемент отсутствует");
+            return;
+        }
+
+        programm = root->FirstChildElement("AlphaServer");
+        XMLElement* variables = programm->FirstChildElement("variables");
+
+        // Перебираем все элементы device
+        for (XMLElement* variable = variables->FirstChildElement("variable"); variable != nullptr; variable = variable->NextSiblingElement("variable")) {
+            std::string variable_name;
+            std::string variable_type;
+            std::string variable_source_name;
+            std::string variable_source_area;
+            std::string variable_source_addr;
+            std::string variable_source_node;
+            std::string variable_transfer_name;
+            std::string variable_transfer_addr;
+            std::string variable_transfer_node;
+
+            if (!variable->FirstChildElement("name") || !variable->FirstChildElement("type")) {
+                continue;
+            }
+            variable_name = variable->FirstChildElement("name")->GetText();
+            variable_type = variable->FirstChildElement("type")->GetText();
+
+            if (variable->FirstChildElement("source")) {
+                XMLElement* source = variable->FirstChildElement("source");
+
+                if (source->FirstChildElement("name") && source->FirstChildElement("area") && source->FirstChildElement("addr") && !source->FirstChildElement("node")) {
+                    variable_source_name = source->FirstChildElement("name")->GetText();
+                    variable_source_area = source->FirstChildElement("area")->GetText();
+                    variable_source_addr = source->FirstChildElement("addr")->GetText();
+                    variable_source_node = "";
+                }
+                if (source->FirstChildElement("name") && !source->FirstChildElement("area") && !source->FirstChildElement("addr") && source->FirstChildElement("node")) {
+                    variable_source_name = source->FirstChildElement("name")->GetText();
+                    variable_source_area = "";
+                    variable_source_addr = "";
+                    variable_source_node = source->FirstChildElement("node")->GetText();
+                }
+            }
+
+            if (variable->FirstChildElement("transfers")) {
+                XMLElement* transfers = variable->FirstChildElement("transfers");
+
+                for (XMLElement* transfer = transfers->FirstChildElement("transfer"); variable != nullptr; transfer = transfer->NextSiblingElement("transfer")) {
+                    if (transfer->FirstChildElement("name") && transfer->FirstChildElement("addr") && !transfer->FirstChildElement("node")) {
+                        variable_transfer_name = transfer->FirstChildElement("name")->GetText();
+                        variable_transfer_addr = transfer->FirstChildElement("addr")->GetText();
+                        variable_transfer_node = "";
+                    }
+                    if (transfer->FirstChildElement("name") && !transfer->FirstChildElement("addr") && transfer->FirstChildElement("node")) {
+                        variable_transfer_name = transfer->FirstChildElement("name")->GetText();
+                        variable_transfer_addr = "";
+                        variable_transfer_node = transfer->FirstChildElement("node")->GetText();
+                    }
+                }
+            }
+        }
     }
 }
