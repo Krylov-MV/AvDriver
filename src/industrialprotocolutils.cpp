@@ -43,7 +43,7 @@ static bool IsIpAddress(const std::string& ip) {
     return true;
 }
 
-void ReadConfig(ModbusTcpClientDeviceConfig &modbus_tcp_client_device_config,
+/*void ReadConfig(ModbusTcpClientDeviceConfig &modbus_tcp_client_device_config,
                 std::vector<ModbusClientConfig> &modbus_tcp_client_configs,
                 OpcUaClientDeviceConfig &opc_ua_client_device_config,
                 std::vector<OpcUaClientConfig> &opc_ua_client_configs) {
@@ -216,4 +216,4 @@ void ReadConfig(ModbusTcpClientDeviceConfig &modbus_tcp_client_device_config,
             }
         }
     }
-}
+}*/

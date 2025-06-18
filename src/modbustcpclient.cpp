@@ -3,12 +3,11 @@
 #include <unistd.h>
 #include <cstring>
 
-ModbusTcpClient::ModbusTcpClient(const std::string ip, const int port, const int timeout, ModbusMemory &memory, std::mutex &mutex_memory) :
-    ip_(ip), port_(port), timeout_(timeout), memory_(memory), mutex_memory_(mutex_memory), is_connected_(false), should_run_(false) {}
+ModbusTcpClient::ModbusTcpClient(const std::string ip, const int port, const int timeout, ModbusMemory &memory, std::map<std::string, Variable> &variables, std::mutex &mutex_memory, std::mutex &mutex_variables) :
+    ip_(ip), port_(port), timeout_(timeout), memory_(memory), variables_(variables), mutex_memory_(mutex_memory), mutex_variables_(mutex_variables), is_connected_(false) {}
 
 ModbusTcpClient::~ModbusTcpClient() {
     is_connected_ = false;
-    should_run_ = false;
     shutdown(socket_, SHUT_RDWR);
     close(socket_);
 }
@@ -82,10 +81,6 @@ void ModbusTcpClient::Disconnect() {
     is_connected_ = false;
 }
 
-void ModbusTcpClient::Stop() {
-    should_run_ = false;
-}
-
 void ModbusTcpClient::IncTransactionId() {
     if (transaction_id_ >= 255) {
         transaction_id_ = 1;
@@ -109,6 +104,7 @@ int ModbusTcpClient::ReceiveResponse() {
             uint8_t function{0};
             uint16_t addr{0};
             uint16_t len{0};
+            std::vector<ModbusVariable> variables;
             {
                 std::lock_guard<std::mutex> lock(mutex_transaction_id_);
                 const auto it = queue_.find(response[1]);
@@ -116,6 +112,7 @@ int ModbusTcpClient::ReceiveResponse() {
                     function = it->second.function;
                     addr = it->second.addr_high_byte << 8 | it->second.addr_low_byte;
                     len = it->second.len_high_byte << 8 | it->second.len_low_byte;
+                    variables = it->second.variables;
                     queue_.erase(it);
                 } else {
                     //Если пакет в очереди не найден, значит прилетел мусор
@@ -132,6 +129,9 @@ int ModbusTcpClient::ReceiveResponse() {
                         std::lock_guard<std::mutex> lock(mutex_memory_);
                         memory_.holding_registers[addr + j] = {value, 0, unix_timestamp_ms};
                     }
+                    for (const ModbusVariable &variable : variables) {
+                        GetValue(variable);
+                    }
                 }
             }
         } else {
@@ -142,7 +142,7 @@ int ModbusTcpClient::ReceiveResponse() {
     }
 }
 
-void ModbusTcpClient::WriteHoldingRegisters(const ModbusClientConfig &config, const uint16_t *value) {
+void ModbusTcpClient::WriteHoldingRegisters(const ModbusRequestConfig &config, const uint16_t *value) {
     if (is_connected_) {
         // Формируем запрос на запись регистров
         unsigned char request[13 + config.len * 2];
@@ -174,7 +174,7 @@ void ModbusTcpClient::WriteHoldingRegisters(const ModbusClientConfig &config, co
 
         //Добавляем пакет в очередь ожидания ответа
         {
-            queue_[transaction_id_] = {request[7], request[8], request[9], request[10], request[11]};
+            queue_[transaction_id_] = {request[7], request[8], request[9], request[10], request[11], {}};
             std::lock_guard<std::mutex> lock(mutex_transaction_id_);
             IncTransactionId();
         }
@@ -191,7 +191,7 @@ void ModbusTcpClient::WriteHoldingRegisters(const ModbusClientConfig &config, co
     }
 }
 
-void ModbusTcpClient::ReadHoldingRegisters(const ModbusClientConfig &config) {
+void ModbusTcpClient::ReadHoldingRegisters(const ModbusRequestConfig &config) {
     if (is_connected_) {
         // Формируем запрос на чтение регистров
         uint8_t request[12];
@@ -217,7 +217,7 @@ void ModbusTcpClient::ReadHoldingRegisters(const ModbusClientConfig &config) {
 
         //Добавляем пакет в очередь ожидания ответа
         {
-            queue_[transaction_id_] = {request[7], request[8], request[9], request[10], request[11]};
+            queue_[transaction_id_] = {request[7], request[8], request[9], request[10], request[11], config.variables};
             std::lock_guard<std::mutex> lock(mutex_transaction_id_);
             IncTransactionId();
         }
@@ -234,7 +234,7 @@ void ModbusTcpClient::ReadHoldingRegisters(const ModbusClientConfig &config) {
     }
 }
 
-void ModbusTcpClient::ReadHoldingRegistersEx(const ModbusClientConfig &config) {
+void ModbusTcpClient::ReadHoldingRegistersEx(const ModbusRequestConfig &config) {
     if (is_connected_) {
         // Формируем запрос на чтение регистров
         uint8_t request[12];
@@ -260,7 +260,7 @@ void ModbusTcpClient::ReadHoldingRegistersEx(const ModbusClientConfig &config) {
 
         //Добавляем пакет в очередь ожидания ответа
         {
-            queue_[transaction_id_] = {request[7], request[8], request[9], request[10], request[11]};
+            queue_[transaction_id_] = {request[7], request[8], request[9], request[10], request[11], config.variables};
             std::lock_guard<std::mutex> lock(mutex_transaction_id_);
             IncTransactionId();
         }
@@ -273,6 +273,52 @@ void ModbusTcpClient::ReadHoldingRegistersEx(const ModbusClientConfig &config) {
             std::lock_guard<std::mutex> lock(mutex_transaction_id_);
             queue_.clear();
             Disconnect();
+        }
+    }
+}
+
+void ModbusTcpClient::GetValue(ModbusVariable variable) {
+    uint16_t high_value{0};
+    uint16_t low_value{0};
+    uint8_t quality{0};
+    uint64_t timestamp_receive{0};
+
+    {
+        std::lock_guard<std::mutex> lock(mutex_memory_);
+        const auto &it1 = memory_.holding_registers.find(variable.addr);
+        if (it1 != memory_.holding_registers.end()) {
+            high_value = it1->second.value;
+            quality = it1->second.quality;
+            timestamp_receive = it1->second.timestamp_receive;
+            if (variable.type == "DINT" || variable.type == "UDINT" || variable.type == "DWORD" || variable.type == "REAL") {
+                const auto &it2 = memory_.holding_registers.find(variable.addr + 1);
+                if (it2 != memory_.holding_registers.end()) {
+                    low_value = it2->second.value;
+                } else {
+                    quality = 1;
+                }
+            }
+        } else {
+            quality = 1;
+        }
+    }
+
+    if (quality == 0) {
+        std::lock_guard<std::mutex> lock(mutex_variables_);
+        if (variable.type == "INT") {
+            variables_[variable.name].SetValue(static_cast<int>(high_value), timestamp_receive);
+        }
+        if (variable.type == "DINT") {
+            variables_[variable.name].SetValue(static_cast<int>(high_value << 16 | low_value), timestamp_receive);
+        }
+        if (variable.type == "UINT" || variable.type == "WORD") {
+            variables_[variable.name].SetValue(static_cast<unsigned int>(high_value), timestamp_receive);
+        }
+        if (variable.type == "UDINT" || variable.type == "DWORD") {
+            variables_[variable.name].SetValue(static_cast<unsigned int>(high_value << 16 | low_value), timestamp_receive);
+        }
+        if (variable.type == "REAL") {
+            variables_[variable.name].SetValue(static_cast<float>(high_value << 16 | low_value), timestamp_receive);
         }
     }
 }
