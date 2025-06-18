@@ -327,32 +327,9 @@ int main() {
             continue;
         }
 
-        //std::cout << "Beg OpcUaToModbusTcp" << std::endl;
         if (!opc_to_modbus_tcp_configs.empty()) OpcUaToModbusTcp(opc_ua_device_config, opc_to_modbus_tcp_configs, opc_to_modbus_results, opc_ua_client, modbus_tcp_device_config, modbus_tcp_clients);
-        //std::cout << "End OpcUaToModbusTcp" << std::endl;
-        //std::cout << "Beg ModbusTcpToOpcUa" << std::endl;
         if (!modbus_tcp_to_opc_configs.empty()) ModbusTcpToOpcUa(modbus_tcp_device_config, modbus_tcp_to_opc_configs, modbus_tcp_clients, opc_ua_client);
-        //std::cout << "End ModbusTcpToOpcUa" << std::endl;
     }
-
-/*modbus_t *ctx;
-
-uint8_t raw_req[] = { 0xFF, 0x43, 0x00, 0x01, 0x02, 0xCF };
-int req_length;
-uint8_t rsp[1460];
-
-ctx = modbus_new_tcp("127.0.0.1", 502);
-if (modbus_connect(ctx) == -1) {
-    fprintf(stderr, "Connection failed: %s\n", modbus_strerror(errno));
-    modbus_free(ctx);
-    return -1;
-}
-
-req_length = modbus_send_raw_request(ctx, raw_req, 6 * sizeof(uint8_t));
-modbus_receive_confirmation(ctx, rsp);
-
-modbus_close(ctx);
-modbus_free(ctx);*/
 
     return 0;
 }
