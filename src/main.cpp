@@ -61,6 +61,9 @@ void ModbusTcpToOpcUa(const IndustrialProtocolUtils::ModbusTcpDeviceConfig &modb
             modbus_tcp_clients_index.push_back(i);
         }
     }
+
+    if (max_socket_in_eth == 0) return;
+
     //std::cout << max_socket_in_eth << std::endl;
     uint max_thread_in_eth = modbus_configs.size() / max_socket_in_eth;// + modbus_configs.size() % max_socket_in_eth;
     if (modbus_configs.size() % max_socket_in_eth != 0) { max_thread_in_eth++; }
@@ -75,15 +78,17 @@ void ModbusTcpToOpcUa(const IndustrialProtocolUtils::ModbusTcpDeviceConfig &modb
 
     //Опрос всех соединений
     //std::cout << "//Опрос всех соединений" << std::endl;
-    std::vector<std::thread> threads;
-    for (unsigned long i = 0; i < max_socket_in_eth; i++) {
-        if (!(thread_modbus_tcp_to_opc_configs.empty() || data_results.empty())) {
-            threads.emplace_back([&, i] () {ThreadModbusTcpClientRead(modbus_tcp_clients[modbus_tcp_clients_index[i]], thread_modbus_tcp_to_opc_configs[i], data_results[i]);});
+    {
+        std::vector<std::thread> threads;
+        for (unsigned long i = 0; i < max_socket_in_eth; i++) {
+            if (!(thread_modbus_tcp_to_opc_configs.empty() || data_results.empty())) {
+                threads.emplace_back([&, i] () {ThreadModbusTcpClientRead(modbus_tcp_clients[modbus_tcp_clients_index[i]], thread_modbus_tcp_to_opc_configs[i], data_results[i]);});
+            }
         }
-    }
-    for (auto& th : threads) {
-        if (th.joinable()) {
-            th.join();
+        for (auto& th : threads) {
+            if (th.joinable()) {
+                th.join();
+            }
         }
     }
 
@@ -239,6 +244,8 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
         }
     }
 
+    if (max_socket_in_eth == 0) return;
+
     std::vector<std::vector<std::vector<IndustrialProtocolUtils::DataConfig>>> thread_modbus_tcp_to_opc_configs(max_socket_in_eth);
     std::vector<std::vector<std::vector<uint16_t>>> threads_datas(max_socket_in_eth);
 
@@ -253,18 +260,19 @@ void OpcUaToModbusTcp(const IndustrialProtocolUtils::OpcUaDeviceConfig &opc_ua_d
         }
     }
 
-    std::vector<std::thread> threads;
-
-    for (unsigned long i = 0; i < max_socket_in_eth; i++) {
-        if (!thread_modbus_tcp_to_opc_configs[i].empty() && !first_cicle)
-        {
-            threads.emplace_back([&,i] () {ThreadModbusTcpClientWrite(modbus_tcp_clients[modbus_tcp_clients_index[i]], thread_modbus_tcp_to_opc_configs[i], threads_datas[i]);});
+    {
+        std::vector<std::thread> threads;
+        for (unsigned long i = 0; i < max_socket_in_eth; i++) {
+            if (!thread_modbus_tcp_to_opc_configs[i].empty() && !first_cicle)
+            {
+                threads.emplace_back([&,i] () {ThreadModbusTcpClientWrite(modbus_tcp_clients[modbus_tcp_clients_index[i]], thread_modbus_tcp_to_opc_configs[i], threads_datas[i]);});
+            }
         }
-    }
 
-    for (auto& th : threads) {
-        if (th.joinable()) {
-            th.join();
+        for (auto& th : threads) {
+            if (th.joinable()) {
+                th.join();
+            }
         }
     }
 
