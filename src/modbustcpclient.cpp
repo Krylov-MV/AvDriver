@@ -16,10 +16,10 @@ bool ModbusTcpClient::Connect() {
     //Открываем сокет
     socket_ = socket(AF_INET, SOCK_STREAM, 0);
     if (socket_ < 0) {
-        Log("Ошибка открытия сокета \n");
+        ///Log("Ошибка открытия сокета \n");
         return is_connected_ = false;
     }
-    Log("Сокет открыт \n");
+    ///Log("Сокет открыт \n");
 
     //Устанавливаем соединение
     sockaddr_in_.sin_family = AF_INET;
@@ -28,12 +28,12 @@ bool ModbusTcpClient::Connect() {
     inet_pton(AF_INET, ip_.c_str(), &sockaddr_in_.sin_addr);
 
     if (connect(socket_, (struct sockaddr*)&sockaddr_in_, sizeof(sockaddr_in_)) < 0) {
-        Log("Ошибка подключения \n");
+        ///Log("Ошибка подключения \n");
         shutdown(socket_, SHUT_RDWR);
         close(socket_);
         return is_connected_ = false;
     }
-    Log("Подключение установлено \n");
+    ///Log("Подключение установлено \n");
 
     // Таймауты на чтение/отправку сообщений
     struct timeval timeout;
@@ -42,7 +42,7 @@ bool ModbusTcpClient::Connect() {
 
     // Установка таймаута для чтения
     if (setsockopt(socket_, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout)) < 0) {
-        Log("Ошибка установки таймаута для чтения \n");
+        ///Log("Ошибка установки таймаута для чтения \n");
         shutdown(socket_, SHUT_RDWR);
         close(socket_);
         return is_connected_ = false;
@@ -50,7 +50,7 @@ bool ModbusTcpClient::Connect() {
 
     // Установка таймаута для записи
     if (setsockopt(socket_, SOL_SOCKET, SO_SNDTIMEO, (const char*)&timeout, sizeof(timeout)) < 0) {
-        Log("Ошибка установки таймаута для записи \n");
+        ///Log("Ошибка установки таймаута для записи \n");
         shutdown(socket_, SHUT_RDWR);
         close(socket_);
         return is_connected_ = false;
@@ -67,14 +67,14 @@ void ModbusTcpClient::Disconnect() {
     if (socket_ > 0) {
         // Отключение сокета
         if (shutdown(socket_, SHUT_RDWR) < 0) {
-            Log("Ошибка отключения сокета \n");
+            ///Log("Ошибка отключения сокета \n");
         } else {
-            Log("Сокет корректно отключен \n");
+            ///Log("Сокет корректно отключен \n");
         }
         if (close(socket_) < 0) {
-            Log("Ошибка при закрытии сокета \n");
+            ///Log("Ошибка при закрытии сокета \n");
         } else {
-            Log("Сокет корректно закрыт \n");
+            ///Log("Сокет корректно закрыт \n");
         }
     }
 
@@ -135,7 +135,7 @@ int ModbusTcpClient::ReceiveResponse() {
                 }
             }
         } else {
-            Log("Ошибка получения ответа (превышен интервал ожидания) \n");
+            ///Log("Ошибка получения ответа (превышен интервал ожидания) \n");
             Disconnect();
             break;
         }

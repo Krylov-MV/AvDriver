@@ -1,5 +1,5 @@
 #include "industrialprotocolutils.h"
-
+#include "modbustcpclient.h"
 using namespace tinyxml2;
 
 void Log(const std::string &log_text) {
@@ -43,10 +43,13 @@ static bool IsIpAddress(const std::string& ip) {
     return true;
 }
 
-/*void ReadConfig(ModbusTcpClientDeviceConfig &modbus_tcp_client_device_config,
-                std::vector<ModbusClientConfig> &modbus_tcp_client_configs,
+void ReadConfig(ModbusTcpClientDeviceConfig &modbus_tcp_client_device_config,
+                /*std::vector<ModbusRequestConfig> &modbus_tcp_client_configs,
                 OpcUaClientDeviceConfig &opc_ua_client_device_config,
-                std::vector<OpcUaClientConfig> &opc_ua_client_configs) {
+                std::vector<OpcUaClientConfig> &opc_ua_client_configs),*/
+                std::map<std::string, Variable> &all_variables,
+                std::map<std::string, std::map<std::string, Variable>> &modbus_tcp_client_variables,
+                std::map<std::string, std::map<std::string, Variable>> &opc_ua_client_variables) {
 
     XMLDocument doc;
     // Загружаем XML файл
@@ -72,9 +75,8 @@ static bool IsIpAddress(const std::string& ip) {
         std::vector<std::string> device_connections;
         int device_max_socket = 1;
         int device_max_request = 1;
-        int device_port = 502;
         int device_timeout = 2000;
-        bool device_mapping_full_allow = true;
+        bool device_full_mapping = true;
         bool device_extended_modbus_tcp = false;
         if (device->FirstChildElement("settings")->FirstChildElement("max_socket")) {
             device_max_socket = device->FirstChildElement("settings")->FirstChildElement("max_socket")->IntText();
@@ -82,11 +84,8 @@ static bool IsIpAddress(const std::string& ip) {
         if (device->FirstChildElement("settings")->FirstChildElement("max_request")) {
             device_max_request = device->FirstChildElement("settings")->FirstChildElement("max_request")->IntText();
         }
-        if (device->FirstChildElement("settings")->FirstChildElement("port")) {
-            device_port = device->FirstChildElement("settings")->FirstChildElement("port")->IntText();
-        }
         if (device->FirstChildElement("settings")->FirstChildElement("mapping_full_allow")) {
-            device_mapping_full_allow = device->FirstChildElement("settings")->FirstChildElement("mapping_full_allow")->BoolText();
+            device_full_mapping = device->FirstChildElement("settings")->FirstChildElement("full_mapping")->BoolText();
         }
         if (device->FirstChildElement("settings")->FirstChildElement("extended_modbus_tcp")) {
             device_extended_modbus_tcp = device->FirstChildElement("settings")->FirstChildElement("extended_modbus_tcp")->BoolText();
@@ -111,28 +110,42 @@ static bool IsIpAddress(const std::string& ip) {
         if (device_type == "ModbusTcpClient") {
             if (device_max_socket < 1 || device_max_socket > 16) device_max_socket = 1;
             if (device_max_request < 1 || device_max_request > 32) device_max_request = 1;
-            if (device_port < 0 || device_port > 65535) device_port = 502;
             if (device_timeout < 1000 || device_timeout > 32000) device_timeout = 1000;
 
-            modbus_tcp_client_device_config.max_socket = device_max_socket;
-            modbus_tcp_client_device_config.max_request = device_max_request;
-            modbus_tcp_client_device_config.port = device_port;
-            modbus_tcp_client_device_config.mapping_full_allow = device_mapping_full_allow;
-            modbus_tcp_client_device_config.extended_modbus_tcp = device_extended_modbus_tcp;
-            modbus_tcp_client_device_config.timeout = device_timeout;
+            //modbus_tcp_client_device_config.max_socket = device_max_socket;
+            //modbus_tcp_client_device_config.max_request = device_max_request;
+            //modbus_tcp_client_device_config.full_mapping = device_full_mapping;
+            //modbus_tcp_client_device_config.extended_modbus_tcp = device_extended_modbus_tcp;
+            //modbus_tcp_client_device_config.timeout = device_timeout;
 
             for (const auto &device_connection : device_connections) {
-                if (IsIpAddress(device_connection)) { modbus_tcp_client_device_config.addr.push_back(device_connection); }
+                std::vector<std::string> addr = Split(device_connection, ':');
+                if (addr.size() == 2) {
+                    std::string ip = addr[0];
+                    int port = std::stoi(addr[1]);
+                    if (IsIpAddress(ip)) {
+                        if (port > 0 && port <= 65535) {
+                            //modbus_tcp_client_device_config.addr.push_back(ip);
+                            //modbus_tcp_client_device_config.port.push_back(port);
+                        }
+                    }
+                }
             }
         }
 
         if (device_type == "OpcUaClient") {
-            if (device_port < 0 || device_port > 65535) device_port = 502;
-
-            opc_ua_client_device_config.port = device_port;
-
-            if (device_connections.size() > 0) {
-                if (IsIpAddress(device_connections[0])) { opc_ua_client_device_config.ip = device_connections[0]; }
+            for (const auto &device_connection : device_connections) {
+                std::vector<std::string> addr = Split(device_connection, ':');
+                if (addr.size() == 2) {
+                    std::string ip = addr[0];
+                    int port = std::stoi(addr[1]);
+                    if (IsIpAddress(ip)) {
+                        if (port > 0 && port <= 65535) {
+                            //opc_ua_client_device_config.ip = ip;
+                            //opc_ua_client_device_config.port = port;
+                        }
+                    }
+                }
             }
         }
     }
@@ -181,6 +194,8 @@ static bool IsIpAddress(const std::string& ip) {
             variable_name = variable->FirstChildElement("name")->GetText();
             variable_type = variable->FirstChildElement("type")->GetText();
 
+            all_variables[variable_name] = {variable_name, variable_type};
+
             if (variable->FirstChildElement("source")) {
                 XMLElement* source = variable->FirstChildElement("source");
 
@@ -189,12 +204,16 @@ static bool IsIpAddress(const std::string& ip) {
                     variable_source_area = source->FirstChildElement("area")->GetText();
                     variable_source_addr = source->FirstChildElement("addr")->GetText();
                     variable_source_node = "";
+
+                    modbus_tcp_client_variables[variable_source_name][variable_name] = {variable_name, variable_type};
                 }
                 if (source->FirstChildElement("name") && !source->FirstChildElement("area") && !source->FirstChildElement("addr") && source->FirstChildElement("node")) {
                     variable_source_name = source->FirstChildElement("name")->GetText();
                     variable_source_area = "";
                     variable_source_addr = "";
                     variable_source_node = source->FirstChildElement("node")->GetText();
+
+                    opc_ua_client_variables[variable_source_name][variable_name] = {variable_name, variable_type};
                 }
             }
 
@@ -216,4 +235,4 @@ static bool IsIpAddress(const std::string& ip) {
             }
         }
     }
-}*/
+}

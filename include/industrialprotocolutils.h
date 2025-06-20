@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "modbustcpclient.h"
 #include "variable.h"
 
 #include <open62541/client.h>
@@ -18,6 +19,7 @@
 #include <queue>
 #include <chrono>
 #include <iomanip>
+#include <memory>
 
 struct OpcUaClientDeviceConfig {
     std::string ip;
@@ -35,9 +37,12 @@ static std::vector<std::string> Split(const std::string &str, const char delimit
 
 static bool IsIpAddress(const std::string &ip);
 
-/*void ReadConfig(ModbusTcpClientDeviceConfig &modbus_tcp_client_device_config,
-                std::vector<ModbusClientConfig> &modbus_tcp_client_configs,
+void ReadConfig(ModbusTcpClientDeviceConfig &modbus_tcp_client_device_config,
+                /*std::vector<ModbusRequestConfig> &modbus_tcp_client_configs,
                 OpcUaClientDeviceConfig &opc_ua_client_device_config,
-                std::vector<OpcUaClientConfig> &opc_ua_client_configs);*/
+                std::vector<OpcUaClientConfig> &opc_ua_client_configs),*/
+                std::map<std::string, Variable> &all_variables,
+                std::map<std::string, std::map<std::string, Variable>> &modbus_tcp_client_variables,
+                std::map<std::string, std::map<std::string, Variable>> &opc_ua_client_variables);
 
 #endif // INDUSTRIALPROTOCOLUTILS_H

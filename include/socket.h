@@ -6,6 +6,7 @@
 #include "industrialprotocolutils.h"
 
 #include <arpa/inet.h>
+#include <string>
 
 class Socket
 {

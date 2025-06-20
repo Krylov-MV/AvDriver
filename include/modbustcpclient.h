@@ -1,16 +1,13 @@
 #ifndef MODBUSTCPCLIENT_H
 #define MODBUSTCPCLIENT_H
 
-#pragma once
-
-#include "industrialprotocolutils.h"
-#include "socket.h"
 #include "variable.h"
-
 #include <arpa/inet.h>
 #include <vector>
 #include <map>
 #include <mutex>
+
+#pragma once
 
 struct ModbusTcpClientDeviceConfig {
     std::vector<std::string> addr;
@@ -54,6 +51,8 @@ struct ModbusCheckRequest {
 };
 
 class ModbusTcpClient {
+public:
+
 
 public:
     ModbusTcpClient(const std::string ip, const int port, const int timeout, ModbusMemory &memory, std::map<std::string, Variable> &variables, std::mutex &mutex_memory, std::mutex &mutex_variables);
