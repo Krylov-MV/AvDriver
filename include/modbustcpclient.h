@@ -1,13 +1,13 @@
 #ifndef MODBUSTCPCLIENT_H
 #define MODBUSTCPCLIENT_H
 
+#pragma once
+
 #include "variable.h"
 #include <arpa/inet.h>
 #include <vector>
 #include <map>
 #include <mutex>
-
-#pragma once
 
 struct ModbusTcpClientDeviceConfig {
     std::vector<std::string> addr;
@@ -30,15 +30,37 @@ struct ModbusMemory {
 };
 
 struct ModbusVariable {
+    uint16_t addr;
+    uint16_t len;
     std::string name;
     std::string type;
-    uint16_t addr;
+    uint16_t bit;
 };
 
 struct ModbusRequestConfig {
     uint16_t addr;
     uint16_t len;
     std::vector<ModbusVariable> variables;
+};
+
+struct ModbusRequestWriteConfig {
+    uint16_t addr;
+    uint16_t len;
+    std::string type;
+    int i_;
+    unsigned int u_;
+    float f_;
+    void UpdateSource(int i, unsigned int u, float f) {
+        if (type == "INT" || type == "DINT") {
+            i_ = i;
+        }
+        if (type == "UINT" || type == "UDINT" || type == "WORD" || type == "DWORD") {
+            u_ = u;
+        }
+        if (type == "REAL") {
+            f_ = f;
+        }
+    }
 };
 
 struct ModbusCheckRequest {
@@ -52,10 +74,7 @@ struct ModbusCheckRequest {
 
 class ModbusTcpClient {
 public:
-
-
-public:
-    ModbusTcpClient(const std::string ip, const int port, const int timeout, ModbusMemory &memory, std::map<std::string, Variable> &variables, std::mutex &mutex_memory, std::mutex &mutex_variables);
+    ModbusTcpClient(const std::string ip, const int port, const int timeout, ModbusMemory &memory, std::map<std::string, Variable> &variables, std::mutex &mutex_memory, std::mutex &mutex_variables, std::mutex &mutex_transaction_id);
     ~ModbusTcpClient();
     bool Connect();
     bool CheckConnection();
@@ -73,11 +92,11 @@ private:
     std::map<std::string, Variable> &variables_;
     std::mutex &mutex_memory_;
     std::mutex &mutex_variables_;
+    std::mutex &mutex_transaction_id_;
     bool is_connected_{false};
     uint8_t transaction_id_{1};
     int socket_{-1};
     sockaddr_in sockaddr_in_{};
-    std::mutex mutex_transaction_id_;
     std::map<uint8_t, ModbusCheckRequest> queue_;
 
 private:

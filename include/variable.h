@@ -1,21 +1,19 @@
 #ifndef VARIABLE_H
 #define VARIABLE_H
 
+#pragma once
+
 #include <string>
 #include <vector>
 #include <functional>
-#include <memory>
-#include <type_traits>
 
-#pragma once
-
-class Variable //: public std::enable_shared_from_this<Variable>
+class Variable
 {
 public:
     Variable();
     Variable(const std::string name, const std::string type);
 
-    void AddUpdateValueCallback(const std::function<void()> &callback);
+    void AddUpdateValueCallback(std::function<void()> callback);
     void SetValue(int value, uint64_t timestamp, bool check_timestamp = false);
     void SetValue(unsigned int value, uint64_t timestamp, bool check_timestamp = false);
     void SetValue(float value, uint64_t timestamp, bool check_timestamp = false);

@@ -1,6 +1,8 @@
 #ifndef OPCUACLIENT_H
 #define OPCUACLIENT_H
 
+#pragma once
+
 #include <open62541/client.h>
 #include <open62541/plugin/log_stdout.h>
 #include <vector>
@@ -8,8 +10,6 @@
 #include <set>
 #include <memory>
 #include <string>
-
-#pragma once
 
 class OpcUaClient {
 public:
@@ -33,6 +33,7 @@ public:
 
     struct Value {
         union {
+            bool b;
             int i;
             unsigned int u;
             float f;
@@ -69,7 +70,7 @@ private:
     UA_Client* client_;
     bool is_connected_{false};
     bool should_run_{false};
-    const std::set<std::string> types_ = { "INT", "UINT", "WORD", "DINT", "UDINT", "DWORD", "REAL" };
+    const std::set<std::string> types_ = { "BOOL", "INT", "UINT", "WORD", "DINT", "UDINT", "DWORD", "REAL" };
 
 private:
     void Stop();

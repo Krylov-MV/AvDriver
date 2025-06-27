@@ -3,8 +3,8 @@
 #include <unistd.h>
 #include <cstring>
 
-ModbusTcpClient::ModbusTcpClient(const std::string ip, const int port, const int timeout, ModbusMemory &memory, std::map<std::string, Variable> &variables, std::mutex &mutex_memory, std::mutex &mutex_variables) :
-    ip_(ip), port_(port), timeout_(timeout), memory_(memory), variables_(variables), mutex_memory_(mutex_memory), mutex_variables_(mutex_variables), is_connected_(false) {}
+ModbusTcpClient::ModbusTcpClient(const std::string ip, const int port, const int timeout, ModbusMemory &memory, std::map<std::string, Variable> &variables, std::mutex &mutex_memory, std::mutex &mutex_variables, std::mutex &mutex_transaction_id) :
+    ip_(ip), port_(port), timeout_(timeout), memory_(memory), variables_(variables), mutex_memory_(mutex_memory), mutex_variables_(mutex_variables), mutex_transaction_id_(mutex_transaction_id), is_connected_(false) {}
 
 ModbusTcpClient::~ModbusTcpClient() {
     is_connected_ = false;

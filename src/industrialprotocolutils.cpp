@@ -44,9 +44,7 @@ static bool IsIpAddress(const std::string& ip) {
 }
 
 void ReadConfig(ModbusTcpClientDeviceConfig &modbus_tcp_client_device_config,
-                /*std::vector<ModbusRequestConfig> &modbus_tcp_client_configs,
                 OpcUaClientDeviceConfig &opc_ua_client_device_config,
-                std::vector<OpcUaClientConfig> &opc_ua_client_configs),*/
                 std::map<std::string, Variable> &all_variables,
                 std::map<std::string, std::map<std::string, Variable>> &modbus_tcp_client_variables,
                 std::map<std::string, std::map<std::string, Variable>> &opc_ua_client_variables) {
@@ -112,11 +110,11 @@ void ReadConfig(ModbusTcpClientDeviceConfig &modbus_tcp_client_device_config,
             if (device_max_request < 1 || device_max_request > 32) device_max_request = 1;
             if (device_timeout < 1000 || device_timeout > 32000) device_timeout = 1000;
 
-            //modbus_tcp_client_device_config.max_socket = device_max_socket;
-            //modbus_tcp_client_device_config.max_request = device_max_request;
-            //modbus_tcp_client_device_config.full_mapping = device_full_mapping;
-            //modbus_tcp_client_device_config.extended_modbus_tcp = device_extended_modbus_tcp;
-            //modbus_tcp_client_device_config.timeout = device_timeout;
+            modbus_tcp_client_device_config.max_socket = device_max_socket;
+            modbus_tcp_client_device_config.max_request = device_max_request;
+            modbus_tcp_client_device_config.full_mapping = device_full_mapping;
+            modbus_tcp_client_device_config.extended_modbus_tcp = device_extended_modbus_tcp;
+            modbus_tcp_client_device_config.timeout = device_timeout;
 
             for (const auto &device_connection : device_connections) {
                 std::vector<std::string> addr = Split(device_connection, ':');
@@ -125,8 +123,8 @@ void ReadConfig(ModbusTcpClientDeviceConfig &modbus_tcp_client_device_config,
                     int port = std::stoi(addr[1]);
                     if (IsIpAddress(ip)) {
                         if (port > 0 && port <= 65535) {
-                            //modbus_tcp_client_device_config.addr.push_back(ip);
-                            //modbus_tcp_client_device_config.port.push_back(port);
+                            modbus_tcp_client_device_config.addr.push_back(ip);
+                            modbus_tcp_client_device_config.port.push_back(port);
                         }
                     }
                 }
@@ -141,8 +139,8 @@ void ReadConfig(ModbusTcpClientDeviceConfig &modbus_tcp_client_device_config,
                     int port = std::stoi(addr[1]);
                     if (IsIpAddress(ip)) {
                         if (port > 0 && port <= 65535) {
-                            //opc_ua_client_device_config.ip = ip;
-                            //opc_ua_client_device_config.port = port;
+                            opc_ua_client_device_config.ip = ip;
+                            opc_ua_client_device_config.port = port;
                         }
                     }
                 }
@@ -183,6 +181,7 @@ void ReadConfig(ModbusTcpClientDeviceConfig &modbus_tcp_client_device_config,
             std::string variable_source_name;
             std::string variable_source_area;
             std::string variable_source_addr;
+            std::string variable_source_bit;
             std::string variable_source_node;
             std::string variable_transfer_name;
             std::string variable_transfer_addr;
@@ -203,17 +202,21 @@ void ReadConfig(ModbusTcpClientDeviceConfig &modbus_tcp_client_device_config,
                     variable_source_name = source->FirstChildElement("name")->GetText();
                     variable_source_area = source->FirstChildElement("area")->GetText();
                     variable_source_addr = source->FirstChildElement("addr")->GetText();
+                    variable_source_bit = source->FirstChildElement("bit")->GetText();
                     variable_source_node = "";
 
                     modbus_tcp_client_variables[variable_source_name][variable_name] = {variable_name, variable_type};
+                    modbus_tcp_client_variables[variable_source_name][variable_name].AddUpdateValueCallback([&, variable_name] () {all_variables[variable_name].SourceUpdate();});
                 }
                 if (source->FirstChildElement("name") && !source->FirstChildElement("area") && !source->FirstChildElement("addr") && source->FirstChildElement("node")) {
                     variable_source_name = source->FirstChildElement("name")->GetText();
                     variable_source_area = "";
                     variable_source_addr = "";
+                    variable_source_bit = "";
                     variable_source_node = source->FirstChildElement("node")->GetText();
 
                     opc_ua_client_variables[variable_source_name][variable_name] = {variable_name, variable_type};
+                    opc_ua_client_variables[variable_source_name][variable_name].AddUpdateValueCallback([&, variable_name] () {all_variables[variable_name].SourceUpdate();});
                 }
             }
 

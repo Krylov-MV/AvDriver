@@ -211,6 +211,11 @@ void OpcUaClient::Write(std::vector<WriteConfig>& configs) {
             items[j].nodeId = UA_NODEID_STRING_ALLOC(1, configs[i].node_id.c_str());
             items[j].attributeId = UA_ATTRIBUTEID_VALUE;
 
+            if (configs[i].type == "BOOL") {
+                items[j].value.value.type = &UA_TYPES[UA_TYPES_BOOLEAN];
+                items[j].value.value.storageType = UA_VARIANT_DATA_NODELETE;
+                items[j].value.value.data = &configs[i].value.b;
+            }
             if (configs[i].type == "INT") {
                 items[j].value.value.type = &UA_TYPES[UA_TYPES_INT16];
                 items[j].value.value.storageType = UA_VARIANT_DATA_NODELETE;
