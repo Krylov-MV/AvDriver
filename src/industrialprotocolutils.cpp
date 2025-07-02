@@ -1,5 +1,7 @@
 #include "industrialprotocolutils.h"
 #include "modbustcpclient.h"
+#include <algorithm>
+
 using namespace tinyxml2;
 
 void Log(const std::string &log_text) {
@@ -43,11 +45,12 @@ static bool IsIpAddress(const std::string& ip) {
     return true;
 }
 
-void ReadConfig(ModbusTcpClientDeviceConfig &modbus_tcp_client_device_config,
-                OpcUaClientDeviceConfig &opc_ua_client_device_config,
+void ReadConfig(std::map<std::string,ModbusTcpClientDeviceConfig> &modbus_tcp_client_device_configs,
+                std::map<std::string,OpcUaClientDeviceConfig> &opc_ua_client_device_configs,
                 std::map<std::string, Variable> &all_variables,
-                std::map<std::string, std::map<std::string, Variable>> &modbus_tcp_client_variables,
-                std::map<std::string, std::map<std::string, Variable>> &opc_ua_client_variables) {
+                std::map<std::string, Variables> &modbus_tcp_client_variables,
+                std::map<std::string, std::map<std::string, std::vector<ModbusRequestConfig>>> &modbus_tcp_client_requests) {//,
+                //std::map<std::string, Variables> &opc_ua_client_variables) {
 
     XMLDocument doc;
     // Загружаем XML файл
@@ -110,11 +113,11 @@ void ReadConfig(ModbusTcpClientDeviceConfig &modbus_tcp_client_device_config,
             if (device_max_request < 1 || device_max_request > 32) device_max_request = 1;
             if (device_timeout < 1000 || device_timeout > 32000) device_timeout = 1000;
 
-            modbus_tcp_client_device_config.max_socket = device_max_socket;
-            modbus_tcp_client_device_config.max_request = device_max_request;
-            modbus_tcp_client_device_config.full_mapping = device_full_mapping;
-            modbus_tcp_client_device_config.extended_modbus_tcp = device_extended_modbus_tcp;
-            modbus_tcp_client_device_config.timeout = device_timeout;
+            modbus_tcp_client_device_configs[device_name].max_socket = device_max_socket;
+            modbus_tcp_client_device_configs[device_name].max_request = device_max_request;
+            modbus_tcp_client_device_configs[device_name].full_mapping = device_full_mapping;
+            modbus_tcp_client_device_configs[device_name].extended_modbus_tcp = device_extended_modbus_tcp;
+            modbus_tcp_client_device_configs[device_name].timeout = device_timeout;
 
             for (const auto &device_connection : device_connections) {
                 std::vector<std::string> addr = Split(device_connection, ':');
@@ -123,8 +126,8 @@ void ReadConfig(ModbusTcpClientDeviceConfig &modbus_tcp_client_device_config,
                     int port = std::stoi(addr[1]);
                     if (IsIpAddress(ip)) {
                         if (port > 0 && port <= 65535) {
-                            modbus_tcp_client_device_config.addr.push_back(ip);
-                            modbus_tcp_client_device_config.port.push_back(port);
+                            modbus_tcp_client_device_configs[device_name].addr.push_back(ip);
+                            modbus_tcp_client_device_configs[device_name].port.push_back(port);
                         }
                     }
                 }
@@ -139,8 +142,8 @@ void ReadConfig(ModbusTcpClientDeviceConfig &modbus_tcp_client_device_config,
                     int port = std::stoi(addr[1]);
                     if (IsIpAddress(ip)) {
                         if (port > 0 && port <= 65535) {
-                            opc_ua_client_device_config.ip = ip;
-                            opc_ua_client_device_config.port = port;
+                            opc_ua_client_device_configs[device_name].ip = ip;
+                            opc_ua_client_device_configs[device_name].port = port;
                         }
                     }
                 }
@@ -171,8 +174,10 @@ void ReadConfig(ModbusTcpClientDeviceConfig &modbus_tcp_client_device_config,
             return;
         }
 
-        programm = root->FirstChildElement("AlphaServer");
+        programm = root->FirstChildElement("AvServer");
         XMLElement* variables = programm->FirstChildElement("variables");
+
+        std::map<std::string, std::map<std::string, std::vector<ModbusVariable>>> temp_modbus_tcp_client_variables;
 
         // Перебираем все элементы device
         for (XMLElement* variable = variables->FirstChildElement("variable"); variable != nullptr; variable = variable->NextSiblingElement("variable")) {
@@ -180,11 +185,11 @@ void ReadConfig(ModbusTcpClientDeviceConfig &modbus_tcp_client_device_config,
             std::string variable_type;
             std::string variable_source_name;
             std::string variable_source_area;
-            std::string variable_source_addr;
-            std::string variable_source_bit;
+            uint16_t variable_source_addr;
+            uint16_t variable_source_bit;
             std::string variable_source_node;
             std::string variable_transfer_name;
-            std::string variable_transfer_addr;
+            uint16_t variable_transfer_addr;
             std::string variable_transfer_node;
 
             if (!variable->FirstChildElement("name") || !variable->FirstChildElement("type")) {
@@ -201,39 +206,87 @@ void ReadConfig(ModbusTcpClientDeviceConfig &modbus_tcp_client_device_config,
                 if (source->FirstChildElement("name") && source->FirstChildElement("area") && source->FirstChildElement("addr") && !source->FirstChildElement("node")) {
                     variable_source_name = source->FirstChildElement("name")->GetText();
                     variable_source_area = source->FirstChildElement("area")->GetText();
-                    variable_source_addr = source->FirstChildElement("addr")->GetText();
-                    variable_source_bit = source->FirstChildElement("bit")->GetText();
-                    variable_source_node = "";
+                    variable_source_addr = source->FirstChildElement("addr")->IntText();
+                    //variable_source_bit = source->FirstChildElement("bit")->IntText();
 
-                    modbus_tcp_client_variables[variable_source_name][variable_name] = {variable_name, variable_type};
-                    modbus_tcp_client_variables[variable_source_name][variable_name].AddUpdateValueCallback([&, variable_name] () {all_variables[variable_name].SourceUpdate();});
+                    modbus_tcp_client_variables[variable_source_name][variable_name].AddUpdateValueCallback([&, variable_name] (Value &value) {all_variables[variable_name].SourceUpdate(value);});
+
+                    temp_modbus_tcp_client_variables[variable_source_name][variable_source_area].push_back({variable_name, variable_type, variable_source_addr});//, variable_source_bit});
                 }
-                if (source->FirstChildElement("name") && !source->FirstChildElement("area") && !source->FirstChildElement("addr") && source->FirstChildElement("node")) {
+                /*if (source->FirstChildElement("name") && !source->FirstChildElement("area") && !source->FirstChildElement("addr") && source->FirstChildElement("node")) {
                     variable_source_name = source->FirstChildElement("name")->GetText();
-                    variable_source_area = "";
-                    variable_source_addr = "";
-                    variable_source_bit = "";
                     variable_source_node = source->FirstChildElement("node")->GetText();
 
-                    opc_ua_client_variables[variable_source_name][variable_name] = {variable_name, variable_type};
-                    opc_ua_client_variables[variable_source_name][variable_name].AddUpdateValueCallback([&, variable_name] () {all_variables[variable_name].SourceUpdate();});
-                }
+                    opc_ua_client_variables[variable_source_name][variable_name] = {variable_name, variable_type, variable_source_node};
+
+                    opc_ua_client_variables[variable_source_name][variable_name].AddUpdateValueCallback([&, variable_name] (Value &value) {all_variables[variable_name].SourceUpdate(value);});
+                }*/
             }
 
-            if (variable->FirstChildElement("transfers")) {
+            /*if (variable->FirstChildElement("transfers")) {
                 XMLElement* transfers = variable->FirstChildElement("transfers");
 
                 for (XMLElement* transfer = transfers->FirstChildElement("transfer"); variable != nullptr; transfer = transfer->NextSiblingElement("transfer")) {
                     if (transfer->FirstChildElement("name") && transfer->FirstChildElement("addr") && !transfer->FirstChildElement("node")) {
                         variable_transfer_name = transfer->FirstChildElement("name")->GetText();
-                        variable_transfer_addr = transfer->FirstChildElement("addr")->GetText();
-                        variable_transfer_node = "";
+                        variable_transfer_addr = transfer->FirstChildElement("addr")->IntText();
                     }
                     if (transfer->FirstChildElement("name") && !transfer->FirstChildElement("addr") && transfer->FirstChildElement("node")) {
                         variable_transfer_name = transfer->FirstChildElement("name")->GetText();
-                        variable_transfer_addr = "";
                         variable_transfer_node = transfer->FirstChildElement("node")->GetText();
                     }
+                }
+            }*/
+        }
+
+        //Сортировка по адресу в каждой области памяти (функции)
+        for (auto &device : temp_modbus_tcp_client_variables) {
+            for (auto &area : device.second) {
+                std::sort(area.second.begin(), area.second.end(), [](const auto &a, const auto &b) {return a.addr > b.addr;});
+            }
+        }
+
+        //Сбор пакетов чтения в каждой области
+        for (auto &device : temp_modbus_tcp_client_variables) {
+            for (auto &area : device.second) {
+                uint16_t addr{0};
+                uint16_t len{0};
+                uint16_t request_addr{0};
+                uint16_t request_len{0};
+                uint16_t max_len{0};
+                std::vector<ModbusVariable> request_variables;
+                for (const auto &variable : area.second) {
+                    if (modbus_tcp_client_requests[device.first][area.first].empty()){
+                        request_addr = variable.addr;
+                        request_len = 1;
+                        if (variable.type == "DINT" || variable.type == "UDINT" || variable.type == "DWORD" || variable.type == "REAL") request_len = 2;
+                        request_variables.push_back(variable);
+                    } else {
+                        addr = variable.addr;
+                        len = 1;
+                        if (variable.type == "DINT" || variable.type == "UDINT" || variable.type == "DWORD" || variable.type == "REAL") len = 2;
+
+                        if (area.first == "holding_registers") {
+                            max_len = 125;
+                            if (modbus_tcp_client_device_configs[device.first].extended_modbus_tcp) max_len = 719;
+                        }
+
+                        if (addr - request_addr + len <= max_len) {
+                            request_len = addr - request_addr + len;
+                            request_variables.push_back(variable);
+                        } else {
+                            modbus_tcp_client_requests[device.first][area.first].push_back({request_addr, request_len, request_variables});
+                            request_variables.clear();
+                            request_addr = variable.addr;
+                            request_len = 1;
+                            if (variable.type == "DINT" || variable.type == "UDINT" || variable.type == "DWORD" || variable.type == "REAL") request_len = 2;
+                            request_variables.push_back(variable);
+                        }
+                    }
+                }
+                if (!request_variables.empty()) {
+                    modbus_tcp_client_requests[device.first][area.first].push_back({request_addr, request_len, request_variables});
+                    request_variables.clear();
                 }
             }
         }

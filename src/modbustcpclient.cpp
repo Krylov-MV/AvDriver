@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <cstring>
 
-ModbusTcpClient::ModbusTcpClient(const std::string ip, const int port, const int timeout, ModbusMemory &memory, std::map<std::string, Variable> &variables, std::mutex &mutex_memory, std::mutex &mutex_variables, std::mutex &mutex_transaction_id) :
+ModbusTcpClient::ModbusTcpClient(const std::string ip, const int port, const int timeout, ModbusMemory &memory, Variables &variables, std::mutex &mutex_memory, std::mutex &mutex_variables, std::mutex &mutex_transaction_id) :
     ip_(ip), port_(port), timeout_(timeout), memory_(memory), variables_(variables), mutex_memory_(mutex_memory), mutex_variables_(mutex_variables), mutex_transaction_id_(mutex_transaction_id), is_connected_(false) {}
 
 ModbusTcpClient::~ModbusTcpClient() {
@@ -140,6 +140,7 @@ int ModbusTcpClient::ReceiveResponse() {
             break;
         }
     }
+    return 0;
 }
 
 void ModbusTcpClient::WriteHoldingRegisters(const ModbusRequestConfig &config, const uint16_t *value) {
@@ -280,8 +281,8 @@ void ModbusTcpClient::ReadHoldingRegistersEx(const ModbusRequestConfig &config) 
 void ModbusTcpClient::GetValue(ModbusVariable variable) {
     uint16_t high_value{0};
     uint16_t low_value{0};
-    uint8_t quality{0};
-    uint64_t timestamp_receive{0};
+    int quality{-1};
+    uint64_t timestamp{0};
 
     {
         std::lock_guard<std::mutex> lock(mutex_memory_);
@@ -289,7 +290,7 @@ void ModbusTcpClient::GetValue(ModbusVariable variable) {
         if (it1 != memory_.holding_registers.end()) {
             high_value = it1->second.value;
             quality = it1->second.quality;
-            timestamp_receive = it1->second.timestamp_receive;
+            timestamp = it1->second.timestamp;
             if (variable.type == "DINT" || variable.type == "UDINT" || variable.type == "DWORD" || variable.type == "REAL") {
                 const auto &it2 = memory_.holding_registers.find(variable.addr + 1);
                 if (it2 != memory_.holding_registers.end()) {
@@ -305,20 +306,17 @@ void ModbusTcpClient::GetValue(ModbusVariable variable) {
 
     if (quality == 0) {
         std::lock_guard<std::mutex> lock(mutex_variables_);
-        if (variable.type == "INT") {
-            variables_[variable.name].SetValue(static_cast<int>(high_value), timestamp_receive);
+        if (variable.type == "INT" || variable.type == "UINT" || variable.type == "WORD") {
+            Value value = static_cast<int>(high_value);
+            variables_[variable.name].SetValue(value, timestamp, quality);
         }
-        if (variable.type == "DINT") {
-            variables_[variable.name].SetValue(static_cast<int>(high_value << 16 | low_value), timestamp_receive);
-        }
-        if (variable.type == "UINT" || variable.type == "WORD") {
-            variables_[variable.name].SetValue(static_cast<unsigned int>(high_value), timestamp_receive);
-        }
-        if (variable.type == "UDINT" || variable.type == "DWORD") {
-            variables_[variable.name].SetValue(static_cast<unsigned int>(high_value << 16 | low_value), timestamp_receive);
+        if (variable.type == "DINT" || variable.type == "UDINT" || variable.type == "DWORD") {
+            Value value = static_cast<int>(high_value << 16 | low_value);
+            variables_[variable.name].SetValue(value, timestamp, quality);
         }
         if (variable.type == "REAL") {
-            variables_[variable.name].SetValue(static_cast<float>(high_value << 16 | low_value), timestamp_receive);
+            Value value = static_cast<float>(high_value << 16 | low_value);
+            variables_[variable.name].SetValue(value, timestamp, quality);
         }
     }
 }

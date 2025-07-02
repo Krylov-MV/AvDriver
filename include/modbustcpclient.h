@@ -21,8 +21,8 @@ struct ModbusTcpClientDeviceConfig {
 
 struct ModbusValue {
     uint16_t value;
-    uint8_t quality;
-    uint64_t timestamp_receive;
+    int quality;
+    uint64_t timestamp;
 };
 
 struct ModbusMemory {
@@ -30,37 +30,16 @@ struct ModbusMemory {
 };
 
 struct ModbusVariable {
-    uint16_t addr;
-    uint16_t len;
     std::string name;
     std::string type;
-    uint16_t bit;
+    uint16_t addr;
+    //uint16_t bit;
 };
 
 struct ModbusRequestConfig {
     uint16_t addr;
     uint16_t len;
     std::vector<ModbusVariable> variables;
-};
-
-struct ModbusRequestWriteConfig {
-    uint16_t addr;
-    uint16_t len;
-    std::string type;
-    int i_;
-    unsigned int u_;
-    float f_;
-    void UpdateSource(int i, unsigned int u, float f) {
-        if (type == "INT" || type == "DINT") {
-            i_ = i;
-        }
-        if (type == "UINT" || type == "UDINT" || type == "WORD" || type == "DWORD") {
-            u_ = u;
-        }
-        if (type == "REAL") {
-            f_ = f;
-        }
-    }
 };
 
 struct ModbusCheckRequest {
@@ -72,9 +51,11 @@ struct ModbusCheckRequest {
     std::vector<ModbusVariable> variables;
 };
 
+using Variables = std::map<std::string, Variable>;
+
 class ModbusTcpClient {
 public:
-    ModbusTcpClient(const std::string ip, const int port, const int timeout, ModbusMemory &memory, std::map<std::string, Variable> &variables, std::mutex &mutex_memory, std::mutex &mutex_variables, std::mutex &mutex_transaction_id);
+    ModbusTcpClient(const std::string ip, const int port, const int timeout, ModbusMemory &memory, Variables &variables, std::mutex &mutex_memory, std::mutex &mutex_variables, std::mutex &mutex_transaction_id);
     ~ModbusTcpClient();
     bool Connect();
     bool CheckConnection();
@@ -89,7 +70,7 @@ private:
     int port_{502};
     int timeout_{5000};
     ModbusMemory &memory_;
-    std::map<std::string, Variable> &variables_;
+    Variables &variables_;
     std::mutex &mutex_memory_;
     std::mutex &mutex_variables_;
     std::mutex &mutex_transaction_id_;
