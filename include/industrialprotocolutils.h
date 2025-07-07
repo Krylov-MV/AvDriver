@@ -36,9 +36,9 @@ static std::vector<std::string> Split(const std::string &str, const char delimit
 
 static bool IsIpAddress(const std::string &ip);
 
-void ReadConfig(std::map<std::string,ModbusTcpClientDeviceConfig> &modbus_tcp_client_device_configs,
-                std::map<std::string,OpcUaClientDeviceConfig> &opc_ua_client_device_configs,
-                std::map<std::string, Variable> &all_variables,
+void ReadConfig(std::map<std::string, ModbusTcpClientDeviceConfig> &modbus_tcp_client_device_configs,
+                std::map<std::string, OpcUaClientDeviceConfig> &opc_ua_client_device_configs,
+                std::map<std::string, Variable> &server_variables,
                 std::map<std::string, Variables> &modbus_tcp_client_variables,
                 std::map<std::string, std::map<std::string, std::vector<ModbusRequestConfig>>> &modbus_tcp_client_requests); //,
                 //std::map<std::string, Variables> &opc_ua_client_variables);

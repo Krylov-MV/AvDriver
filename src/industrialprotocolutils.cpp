@@ -16,7 +16,7 @@ void Log(const std::string &log_text) {
     // Записываем лог с датой и временем с миллисекундами
     std::lock_guard<std::mutex> guard(file_mutex); // Блокируем мьютекс
     std::ofstream log_file("log.txt", std::ios::app);
-    log_file << std::put_time(pTime, "%Y-%m-%d %H:%M:%S") << '.' << (milliseconds % 1000) << ' ' << log_text;
+    log_file << std::put_time(pTime, "%Y-%m-%d %H:%M:%S") << '.' << (milliseconds % 1000) << ' ' << log_text << "\n";
 }
 
 static std::vector<std::string> Split(const std::string &str, const char delimiter) {
@@ -45,9 +45,9 @@ static bool IsIpAddress(const std::string& ip) {
     return true;
 }
 
-void ReadConfig(std::map<std::string,ModbusTcpClientDeviceConfig> &modbus_tcp_client_device_configs,
-                std::map<std::string,OpcUaClientDeviceConfig> &opc_ua_client_device_configs,
-                std::map<std::string, Variable> &all_variables,
+void ReadConfig(std::map<std::string, ModbusTcpClientDeviceConfig> &modbus_tcp_client_device_configs,
+                std::map<std::string, OpcUaClientDeviceConfig> &opc_ua_client_device_configs,
+                std::map<std::string, Variable> &server_variables,
                 std::map<std::string, Variables> &modbus_tcp_client_variables,
                 std::map<std::string, std::map<std::string, std::vector<ModbusRequestConfig>>> &modbus_tcp_client_requests) {//,
                 //std::map<std::string, Variables> &opc_ua_client_variables) {
@@ -183,7 +183,7 @@ void ReadConfig(std::map<std::string,ModbusTcpClientDeviceConfig> &modbus_tcp_cl
         for (XMLElement* variable = variables->FirstChildElement("variable"); variable != nullptr; variable = variable->NextSiblingElement("variable")) {
             std::string variable_name;
             std::string variable_type;
-            std::string variable_source_name;
+            std::string variable_source_device;
             std::string variable_source_area;
             uint16_t variable_source_addr;
             uint16_t variable_source_bit;
@@ -198,28 +198,28 @@ void ReadConfig(std::map<std::string,ModbusTcpClientDeviceConfig> &modbus_tcp_cl
             variable_name = variable->FirstChildElement("name")->GetText();
             variable_type = variable->FirstChildElement("type")->GetText();
 
-            all_variables[variable_name] = {variable_name, variable_type};
+            server_variables[variable_name] = {variable_name, variable_type};
 
             if (variable->FirstChildElement("source")) {
                 XMLElement* source = variable->FirstChildElement("source");
 
-                if (source->FirstChildElement("name") && source->FirstChildElement("area") && source->FirstChildElement("addr") && !source->FirstChildElement("node")) {
-                    variable_source_name = source->FirstChildElement("name")->GetText();
+                if (source->FirstChildElement("device") && source->FirstChildElement("area") && source->FirstChildElement("addr") && !source->FirstChildElement("node")) {
+                    variable_source_device = source->FirstChildElement("device")->GetText();
                     variable_source_area = source->FirstChildElement("area")->GetText();
                     variable_source_addr = source->FirstChildElement("addr")->IntText();
                     //variable_source_bit = source->FirstChildElement("bit")->IntText();
 
-                    modbus_tcp_client_variables[variable_source_name][variable_name].AddUpdateValueCallback([&, variable_name] (Value &value) {all_variables[variable_name].SourceUpdate(value);});
+                    modbus_tcp_client_variables[variable_source_device][variable_name].AddUpdateValueCallback([&, variable_name] (Value &value) {server_variables[variable_name].SourceUpdate(value);});
 
-                    temp_modbus_tcp_client_variables[variable_source_name][variable_source_area].push_back({variable_name, variable_type, variable_source_addr});//, variable_source_bit});
+                    temp_modbus_tcp_client_variables[variable_source_device][variable_source_area].push_back({variable_name, variable_type, variable_source_addr});//, variable_source_bit});
                 }
-                /*if (source->FirstChildElement("name") && !source->FirstChildElement("area") && !source->FirstChildElement("addr") && source->FirstChildElement("node")) {
-                    variable_source_name = source->FirstChildElement("name")->GetText();
+                /*if (source->FirstChildElement("device") && !source->FirstChildElement("area") && !source->FirstChildElement("addr") && source->FirstChildElement("node")) {
+                    variable_source_device = source->FirstChildElement("device")->GetText();
                     variable_source_node = source->FirstChildElement("node")->GetText();
 
-                    opc_ua_client_variables[variable_source_name][variable_name] = {variable_name, variable_type, variable_source_node};
+                    opc_ua_client_variables[variable_source_device][variable_name] = {variable_name, variable_type, variable_source_node};
 
-                    opc_ua_client_variables[variable_source_name][variable_name].AddUpdateValueCallback([&, variable_name] (Value &value) {all_variables[variable_name].SourceUpdate(value);});
+                    opc_ua_client_variables[variable_source_device][variable_name].AddUpdateValueCallback([&, variable_name] (Value &value) {all_variables[variable_name].SourceUpdate(value);});
                 }*/
             }
 
@@ -242,7 +242,7 @@ void ReadConfig(std::map<std::string,ModbusTcpClientDeviceConfig> &modbus_tcp_cl
         //Сортировка по адресу в каждой области памяти (функции)
         for (auto &device : temp_modbus_tcp_client_variables) {
             for (auto &area : device.second) {
-                std::sort(area.second.begin(), area.second.end(), [](const auto &a, const auto &b) {return a.addr > b.addr;});
+                std::sort(area.second.begin(), area.second.end(), [](const auto &a, const auto &b) {return a.addr < b.addr;});
             }
         }
 
@@ -256,7 +256,7 @@ void ReadConfig(std::map<std::string,ModbusTcpClientDeviceConfig> &modbus_tcp_cl
                 uint16_t max_len{0};
                 std::vector<ModbusVariable> request_variables;
                 for (const auto &variable : area.second) {
-                    if (modbus_tcp_client_requests[device.first][area.first].empty()){
+                    if (request_variables.empty()){
                         request_addr = variable.addr;
                         request_len = 1;
                         if (variable.type == "DINT" || variable.type == "UDINT" || variable.type == "DWORD" || variable.type == "REAL") request_len = 2;
@@ -266,21 +266,17 @@ void ReadConfig(std::map<std::string,ModbusTcpClientDeviceConfig> &modbus_tcp_cl
                         len = 1;
                         if (variable.type == "DINT" || variable.type == "UDINT" || variable.type == "DWORD" || variable.type == "REAL") len = 2;
 
-                        if (area.first == "holding_registers") {
+                        if (area.first == "HoldingRegisters") {
                             max_len = 125;
                             if (modbus_tcp_client_device_configs[device.first].extended_modbus_tcp) max_len = 719;
                         }
 
-                        if (addr - request_addr + len <= max_len) {
-                            request_len = addr - request_addr + len;
+                        if ((addr + len - request_addr) <= max_len) {
+                            request_len = (addr + len - request_addr);
                             request_variables.push_back(variable);
                         } else {
                             modbus_tcp_client_requests[device.first][area.first].push_back({request_addr, request_len, request_variables});
                             request_variables.clear();
-                            request_addr = variable.addr;
-                            request_len = 1;
-                            if (variable.type == "DINT" || variable.type == "UDINT" || variable.type == "DWORD" || variable.type == "REAL") request_len = 2;
-                            request_variables.push_back(variable);
                         }
                     }
                 }

@@ -1,7 +1,8 @@
 #include "modbustcpclient.h"
-
+#include "industrialprotocolutils.h"
 #include <unistd.h>
 #include <cstring>
+#include <fcntl.h>
 
 ModbusTcpClient::ModbusTcpClient(const std::string ip, const int port, const int timeout, ModbusMemory &memory, Variables &variables, std::mutex &mutex_memory, std::mutex &mutex_variables, std::mutex &mutex_transaction_id) :
     ip_(ip), port_(port), timeout_(timeout), memory_(memory), variables_(variables), mutex_memory_(mutex_memory), mutex_variables_(mutex_variables), mutex_transaction_id_(mutex_transaction_id), is_connected_(false) {}
@@ -13,48 +14,86 @@ ModbusTcpClient::~ModbusTcpClient() {
 }
 
 bool ModbusTcpClient::Connect() {
-    //Открываем сокет
+    // Открываем сокет
+    Log("Открытие сокета");
     socket_ = socket(AF_INET, SOCK_STREAM, 0);
     if (socket_ < 0) {
-        ///Log("Ошибка открытия сокета \n");
+        Log("Ошибка открытия сокета");
         return is_connected_ = false;
     }
-    ///Log("Сокет открыт \n");
+    Log("Сокет открыт");
 
-    //Устанавливаем соединение
+    Log("Установка подключения");
+    // Устанавливаем неблокирующий режим
+    int flags = fcntl(socket_, F_GETFL, 0);
+    fcntl(socket_, F_SETFL, flags | O_NONBLOCK);
+
+    // Устанавливаем соединение
     sockaddr_in_.sin_family = AF_INET;
-    //sockaddr_in_.sin_addr.s_addr = inet_addr(ip_.c_str());
-    sockaddr_in_.sin_port = htons(port_);
     inet_pton(AF_INET, ip_.c_str(), &sockaddr_in_.sin_addr);
+    sockaddr_in_.sin_port = htons(port_);
 
-    if (connect(socket_, (struct sockaddr*)&sockaddr_in_, sizeof(sockaddr_in_)) < 0) {
-        ///Log("Ошибка подключения \n");
-        shutdown(socket_, SHUT_RDWR);
+    int res = connect(socket_, (struct sockaddr*)&sockaddr_in_, sizeof(sockaddr_in_));
+    if (res < 0 && errno != EINPROGRESS) {
+        Log("Ошибка подключения");
         close(socket_);
         return is_connected_ = false;
     }
-    ///Log("Подключение установлено \n");
 
-    // Таймауты на чтение/отправку сообщений
+    // Устанавливаем таймаут для подключения
     struct timeval timeout;
-    timeout.tv_sec = timeout_ / 1000;  // Установите время ожидания в секундах
-    timeout.tv_usec = timeout_ % 1000 * 1000;  // Если необходимо, можно установить микросекунды
+    timeout.tv_sec = 5;//timeout_ / 1000;
+    timeout.tv_usec = 0;//(timeout_ % 1000) * 1000;
 
-    // Установка таймаута для чтения
-    if (setsockopt(socket_, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout)) < 0) {
-        ///Log("Ошибка установки таймаута для чтения \n");
-        shutdown(socket_, SHUT_RDWR);
+    fd_set fdset;
+    FD_ZERO(&fdset);
+    FD_SET(socket_, &fdset);
+
+    res = select(socket_ + 1, NULL, &fdset, NULL, &timeout);
+
+    if (res > 0) {
+        // Проверяем, удалось ли подключиться
+        int so_error;
+        socklen_t len = sizeof(so_error);
+        if (getsockopt(socket_, SOL_SOCKET, SO_ERROR, &so_error, &len) < 0 || so_error != 0) {
+            Log("Ошибка подключения");
+            shutdown(socket_, SHUT_RDWR);
+            close(socket_);
+            return is_connected_ = false;
+        }
+        Log("Подключение установлено");
+    } else if (res == 0) {
+        Log("Таймаут подключения");
+        close(socket_);
+        return is_connected_ = false;
+    } else {
+        Log("Ошибка вызова select");
         close(socket_);
         return is_connected_ = false;
     }
 
-    // Установка таймаута для записи
-    if (setsockopt(socket_, SOL_SOCKET, SO_SNDTIMEO, (const char*)&timeout, sizeof(timeout)) < 0) {
-        ///Log("Ошибка установки таймаута для записи \n");
+    // Установка таймаутов на чтение и запись
+    struct timeval send_timeout, recv_timeout;
+    send_timeout.tv_sec = 5;//timeout_ / 1000;
+    send_timeout.tv_usec = 0;//(timeout_ % 1000) * 1000;
+
+    Log("Установка таймаута для записи");
+    if (setsockopt(socket_, SOL_SOCKET, SO_SNDTIMEO, (const char*)&send_timeout, sizeof(send_timeout)) < 0) {
+        Log("Ошибка установки таймаута для записи");
         shutdown(socket_, SHUT_RDWR);
         close(socket_);
         return is_connected_ = false;
     }
+    Log("Таймуат для записи установлен");
+
+    Log("Установка таймаута для чтения");
+    if (setsockopt(socket_, SOL_SOCKET, SO_RCVTIMEO, (const char*)&recv_timeout, sizeof(recv_timeout)) < 0) {
+        Log("Ошибка установки таймаута для чтения");
+        shutdown(socket_, SHUT_RDWR);
+        close(socket_);
+        return is_connected_ = false;
+    }
+    Log("Таймуат для чтения установлен");
 
     return is_connected_ = true;
 }
@@ -67,14 +106,14 @@ void ModbusTcpClient::Disconnect() {
     if (socket_ > 0) {
         // Отключение сокета
         if (shutdown(socket_, SHUT_RDWR) < 0) {
-            ///Log("Ошибка отключения сокета \n");
+            Log("Ошибка отключения сокета");
         } else {
-            ///Log("Сокет корректно отключен \n");
+            Log("Сокет корректно отключен");
         }
         if (close(socket_) < 0) {
-            ///Log("Ошибка при закрытии сокета \n");
+            Log("Ошибка при закрытии сокета");
         } else {
-            ///Log("Сокет корректно закрыт \n");
+            Log("Сокет корректно закрыт");
         }
     }
 
@@ -135,7 +174,7 @@ int ModbusTcpClient::ReceiveResponse() {
                 }
             }
         } else {
-            ///Log("Ошибка получения ответа (превышен интервал ожидания) \n");
+            Log("Ошибка получения ответа (превышен интервал ожидания)");
             Disconnect();
             break;
         }
@@ -148,7 +187,7 @@ void ModbusTcpClient::WriteHoldingRegisters(const ModbusRequestConfig &config, c
         // Формируем запрос на запись регистров
         unsigned char request[13 + config.len * 2];
         //Идентификатор транзакции
-        request[0] = transaction_id_ >> 8;
+        request[0] = 0;
         request[1] = transaction_id_ & 0xFF;
         //Протокол Modbus
         request[2] = 0x00;
@@ -175,8 +214,8 @@ void ModbusTcpClient::WriteHoldingRegisters(const ModbusRequestConfig &config, c
 
         //Добавляем пакет в очередь ожидания ответа
         {
-            queue_[transaction_id_] = {request[7], request[8], request[9], request[10], request[11], {}};
             std::lock_guard<std::mutex> lock(mutex_transaction_id_);
+            queue_[transaction_id_] = {request[7], request[8], request[9], request[10], request[11], {}};
             IncTransactionId();
         }
 
@@ -218,8 +257,8 @@ void ModbusTcpClient::ReadHoldingRegisters(const ModbusRequestConfig &config) {
 
         //Добавляем пакет в очередь ожидания ответа
         {
-            queue_[transaction_id_] = {request[7], request[8], request[9], request[10], request[11], config.variables};
             std::lock_guard<std::mutex> lock(mutex_transaction_id_);
+            queue_[transaction_id_] = {request[7], request[8], request[9], request[10], request[11], config.variables};
             IncTransactionId();
         }
 
@@ -261,8 +300,8 @@ void ModbusTcpClient::ReadHoldingRegistersEx(const ModbusRequestConfig &config) 
 
         //Добавляем пакет в очередь ожидания ответа
         {
-            queue_[transaction_id_] = {request[7], request[8], request[9], request[10], request[11], config.variables};
             std::lock_guard<std::mutex> lock(mutex_transaction_id_);
+            queue_[transaction_id_] = {request[7], request[8], request[9], request[10], request[11], config.variables};
             IncTransactionId();
         }
 
